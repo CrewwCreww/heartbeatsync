@@ -302,57 +302,66 @@ function createWidget() {
     w.innerHTML = buildStar(cfg().score, cfg().relationType);
     document.body.appendChild(w);
 
-    let isDragging = false, hasMoved = false;
-    let offsetX = 0, offsetY = 0, startX = 0, startY = 0, lastTap = 0;
+    let drag = false;
+    let moved = false;
+    let grabX = 0, grabY = 0;
+    let lastTap = 0;
 
-    w.addEventListener('pointerdown', e => {
-        const rect = w.getBoundingClientRect();
-        offsetX = e.clientX - rect.left;
-        offsetY = e.clientY - rect.top;
-        startX = e.clientX;
-        startY = e.clientY;
-        isDragging = true;
-        hasMoved = false;
+    w.addEventListener('pointerdown', (e) => {
+        const r = w.getBoundingClientRect();
+        grabX = e.clientX - r.left;
+        grabY = e.clientY - r.top;
+        drag = true;
+        moved = false;
         w.setPointerCapture(e.pointerId);
         e.preventDefault();
-        e.stopPropagation();
     });
 
-    w.addEventListener('pointermove', e => {
-        if (!isDragging) return;
-        if (Math.abs(e.clientX - startX) > 6 || Math.abs(e.clientY - startY) > 6) hasMoved = true;
-        if (!hasMoved) return;
+    w.addEventListener('pointermove', (e) => {
+        if (!drag) return;
 
-        let left = Math.max(4, Math.min(window.innerWidth - 90, e.clientX - offsetX));
-        let top = Math.max(4, Math.min(window.innerHeight - 100, e.clientY - offsetY));
+        const dx = Math.abs(e.clientX - (w.getBoundingClientRect().left + grabX));
+        const dy = Math.abs(e.clientY - (w.getBoundingClientRect().top + grabY));
+
+        if (!moved && (dx > 4 || dy > 4)) moved = true;
+        if (!moved) return;
+
+        let left = e.clientX - grabX;
+        let top  = e.clientY - grabY;
+
+        left = Math.max(8, Math.min(window.innerWidth - w.offsetWidth - 8, left));
+        top  = Math.max(8, Math.min(window.innerHeight - w.offsetHeight - 8, top));
+
         w.style.left = left + 'px';
-        w.style.top = top + 'px';
+        w.style.top  = top + 'px';
         w.style.right = 'auto';
         w.style.bottom = 'auto';
     });
 
-    w.addEventListener('pointerup', e => {
-        if (!isDragging) return;
-        isDragging = false;
+    w.addEventListener('pointerup', () => {
+        if (!drag) return;
+        drag = false;
 
-        if (hasMoved) {
+        if (moved) {
             cfg().widgetPos = { top: w.style.top, left: w.style.left };
             save();
             return;
         }
 
+        // Точно как в Love Score
         const now = Date.now();
-        if (now - lastTap < 300) {
+        if (now - lastTap < 320) {
             lastTap = 0;
-            e.preventDefault();
-            e.stopPropagation();
             openPanel();
         } else {
             lastTap = now;
+            flashWidget();
         }
     });
 
-    w.addEventListener('pointercancel', () => { isDragging = false; });
+    w.addEventListener('pointercancel', () => {
+        drag = false;
+    });
 
     const pos = cfg().widgetPos;
     if (pos?.top) {
@@ -389,7 +398,7 @@ function openPanel() {
         ov.id = 'hs-overlay';
         ov.innerHTML = '<div id="hs-panel"></div>';
         document.body.appendChild(ov);
-        ov.addEventListener('click', e => {
+        ov.addEventListener('click', (e) => {
             if (e.target === ov) closePanel();
         });
     }
@@ -585,7 +594,7 @@ function addWand() {
     item.id = 'hs-wand';
     item.className = 'list-group-item flex-container flexGap5 interactable';
     item.innerHTML = '<i class="fa-solid fa-star" style="color:#C9A84C"></i><span>Heartbeat Sync</span>';
-    item.onclick = e => {
+    item.onclick = (e) => {
         e.stopPropagation();
         openPanel();
     };
@@ -615,7 +624,7 @@ jQuery(() => {
             });
         }
 
-        console.log('[HS] v5.1 — pulse + tabs');
+        console.log('[HS] v5.2 — full rewrite with Love Score double-tap');
     } catch (e) {
         console.error('[HS]', e);
     }
