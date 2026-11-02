@@ -1,0 +1,11 @@
+{
+        "display_name": "Heartbeat Sync",
+        "loading_order": 10,
+        "requires": [],
+        "optional": [],
+        "js": "script.js",
+        "css": "style.css",
+        "author": "CrewwCreww",
+        "version": "1.0.0",
+        "homePage": "https://github.com/CrewwCreww/heartbeatsync"
+    }
