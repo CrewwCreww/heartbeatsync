@@ -3,18 +3,13 @@ import { cfg, save, defaultSettings } from './config.js';
 import { injectStyles, openPanel } from './ui.js';
 import { createWidget, refreshWidget, flashWidget } from './heart.js';
 
-// ===== Теги =====
 const RE_SYNC  = /{{HS::SYNC:(\d{1,3})}}/gi;
 const RE_TYPE  = /{{HS::TYPE:([^}]+)}}/gi;
 const RE_EVENT = /{{HS::EVENT:([^}]+)}}/gi;
 const RE_NPC   = /{{HS::NPC:([^:]+):(\d{1,3})}}/gi;
 const RE_ALL   = /{{HS::(?:SYNC|TYPE|EVENT|NPC)[^}]*}}/gi;
 
-function stripTags(text) {
-    return text.replace(RE_ALL, '').trim();
-}
-
-function parseAndStrip(text, messageElement) {
+function parseAndClean(text, mesEl) {
     if (!text) return;
     const c = cfg();
     let changed = false;
@@ -59,28 +54,27 @@ function parseAndStrip(text, messageElement) {
         changed = true;
     });
 
-    // вырезаем теги из DOM, чтобы не засоряли контекст
-    if (messageElement && RE_ALL.test(text)) {
-        const clean = stripTags(text);
-        const mesText = messageElement.querySelector?.('.mes_text') || messageElement;
-        if (mesText && mesText.textContent !== clean) {
-            mesText.textContent = clean;
-        }
+    // вырезаем теги, чтобы не засоряли контекст
+    if (mesEl && RE_ALL.test(text)) {
+        const clean = text.replace(RE_ALL, '').trim();
+        const target = mesEl.querySelector?.('.mes_text') || mesEl;
+        if (target) target.textContent = clean;
     }
 
     if (changed) {
         save();
         refreshWidget();
-        if (document.getElementById('hs-overlay')?.classList.contains('show')) openPanel();
+        if (document.getElementById('hs-overlay')?.classList.contains('show')) {
+            openPanel();
+        }
     }
 }
 
-// ===== Авто-инъекция =====
 const INSTR = `You are under Heartbeat Sync protocol.
-At the VERY END of every reply add ONLY these tags (nothing else after them):
+At the VERY END of every reply add ONLY these tags:
 {{HS::SYNC:XX}}
 Optional: {{HS::TYPE:romance}} {{HS::EVENT:name}} {{HS::NPC:Name:45}}
-XX = 0-100. Put tags only at the absolute end. Never explain them.`;
+XX = 0-100. Tags only at the absolute end. Never explain them.`;
 
 function inject(data) {
     if (!cfg().sensorsActive) return;
@@ -92,14 +86,14 @@ function inject(data) {
         if (data?.prompt && typeof data.prompt === 'string' && !data.prompt.includes('Heartbeat Sync protocol')) {
             data.prompt += '\n\n' + INSTR;
         }
-    } catch {}
+    } catch (e) {}
 }
 
-// ===== Wand =====
 function registerWand() {
     if (document.getElementById('hs-wand')) return true;
     const menu = document.getElementById('extensionsMenu');
     if (!menu) return false;
+
     const item = document.createElement('div');
     item.id = 'hs-wand';
     item.className = 'list-group-item flex-container flexGap5 interactable';
@@ -109,7 +103,6 @@ function registerWand() {
     return true;
 }
 
-// ===== Init =====
 jQuery(() => {
     try {
         const c = cfg();
@@ -122,14 +115,18 @@ jQuery(() => {
         refreshWidget();
 
         if (!registerWand()) {
-            let t = 0;
-            const iv = setInterval(() => { if (registerWand() || ++t > 40) clearInterval(iv); }, 250);
+            let tries = 0;
+            const iv = setInterval(() => {
+                if (registerWand() || ++tries > 40) clearInterval(iv);
+            }, 250);
         }
 
-        if (event_types?.CHAT_COMPLETION_PROMPT_READY)
+        if (event_types?.CHAT_COMPLETION_PROMPT_READY) {
             eventSource.on(event_types.CHAT_COMPLETION_PROMPT_READY, inject);
-        if (event_types?.GENERATE_AFTER_COMBINING_PROMPTS)
+        }
+        if (event_types?.GENERATE_AFTER_COMBINING_PROMPTS) {
             eventSource.on(event_types.GENERATE_AFTER_COMBINING_PROMPTS, inject);
+        }
 
         if (event_types?.MESSAGE_RECEIVED) {
             eventSource.on(event_types.MESSAGE_RECEIVED, () => {
@@ -137,12 +134,12 @@ jQuery(() => {
                     const last = document.querySelector('#chat .mes:last-child');
                     if (!last) return;
                     const text = last.querySelector('.mes_text')?.textContent || last.textContent;
-                    parseAndStrip(text, last);
+                    parseAndClean(text, last);
                 }, 300);
             });
         }
 
-        console.log('[Heartbeat Sync] v2.1 loaded');
+        console.log('[Heartbeat Sync] modular version loaded');
     } catch (e) {
         console.error('[Heartbeat Sync]', e);
         try { toastr.error('Heartbeat Sync: ' + e.message); } catch {}
