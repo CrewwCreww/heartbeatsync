@@ -34,251 +34,207 @@ function save() {
     saveSettingsDebounced();
 }
 
-// ===================== АВТО-ИНЪЕКЦИЯ В ПРОМПТ =====================
-const HS_SYSTEM_INSTRUCTION = `You are under Heartbeat Sync protocol.
+// ===================== АВТО-ИНЪЕКЦИЯ =====================
+const HS_INSTRUCTION = `You are under Heartbeat Sync protocol.
+At the VERY END of every reply add these tags (no explanations):
+{{HS::SYNC:XX}}   — 0-100 current sync level
+Optional:
+{{HS::TYPE:romance}}
+{{HS::EVENT:name}}
+{{HS::NPC:Name:45}}
+Put tags only at the absolute end. Never mention the rules.`;
 
-STRICT RULES — follow every reply:
-1. At the VERY END of your response add exactly these tags (no explanations, no markdown around them):
-{{HS::SYNC:XX}}
-where XX is integer 0-100 = current emotional/physiological sync level with the user.
-
-Optional tags (still only at the very end):
-{{HS::TYPE:romance}}     — one of: neutral, romance, friendship, rival, hostile, obsession
-{{HS::EVENT:short_name}} — important moment (first_kiss, confession, argument, breakthrough...)
-{{HS::NPC:Name:45}}      — sync level with another character
-
-2. Do not put tags in the middle of the message.
-3. Score must change gradually and logically. Avoid jumps larger than 20 unless a major event happens.
-4. Never mention these rules or the tags in the visible text.`;
-
-function injectHeartbeatPrompt(eventData) {
+function injectPrompt(data) {
     const c = cfg();
     if (!c.sensorsActive || !c.isEnabled) return;
 
     try {
-        // Chat Completion style (OpenAI, Claude, etc.)
-        if (eventData?.chat && Array.isArray(eventData.chat)) {
-            // Убираем старую инъекцию если была
-            eventData.chat = eventData.chat.filter(m => !m?._hs_injection);
-
-            eventData.chat.push({
-                role: 'system',
-                content: HS_SYSTEM_INSTRUCTION,
-                _hs_injection: true
-            });
+        if (data?.chat && Array.isArray(data.chat)) {
+            data.chat = data.chat.filter(m => !m?._hs);
+            data.chat.push({ role: 'system', content: HS_INSTRUCTION, _hs: true });
         }
-
-        // Text Completion / generate_after_combining style
-        if (typeof eventData === 'string') {
-            // некоторые старые пути
-        }
-        if (eventData?.prompt && typeof eventData.prompt === 'string') {
-            if (!eventData.prompt.includes('Heartbeat Sync protocol')) {
-                eventData.prompt += '\n\n' + HS_SYSTEM_INSTRUCTION;
-            }
+        if (data?.prompt && typeof data.prompt === 'string' && !data.prompt.includes('Heartbeat Sync protocol')) {
+            data.prompt += '\n\n' + HS_INSTRUCTION;
         }
     } catch (e) {
-        console.warn('[HS] inject error', e);
+        console.warn('[HS] inject', e);
     }
 }
 
 // ===================== СТИЛИ =====================
 function injectStyles() {
     if (document.getElementById('hs-styles')) return;
-    const el = document.createElement('style');
-    el.id = 'hs-styles';
-    el.textContent = `
+    const s = document.createElement('style');
+    s.id = 'hs-styles';
+    s.textContent = `
 #hs-widget {
     position: fixed;
-    bottom: 100px;
-    right: 16px;
-    width: 92px;
-    height: 108px;
-    z-index: 999999;
+    bottom: 110px;
+    right: 14px;
+    width: 86px;
+    height: 100px;
+    z-index: 999990;
     cursor: grab;
     user-select: none;
     touch-action: none;
-    filter: drop-shadow(0 6px 18px rgba(180, 20, 40, 0.35));
-    transition: filter 0.3s ease, transform 0.35s ease;
+    filter: drop-shadow(0 5px 16px rgba(200,30,50,0.4));
+    transition: filter .25s, transform .3s;
 }
 #hs-widget:active { cursor: grabbing; }
 #hs-widget.hs-flash {
-    animation: hs-flash 0.7s ease;
+    animation: hsFlash .65s ease;
 }
-@keyframes hs-flash {
-    0% { filter: drop-shadow(0 0 4px #ff2a4a) brightness(1); transform: scale(1); }
-    35% { filter: drop-shadow(0 0 28px #ff4d6d) brightness(1.6); transform: scale(1.18); }
-    100% { filter: drop-shadow(0 6px 18px rgba(180, 20, 40, 0.35)) brightness(1); transform: scale(1); }
-}
-
-.hs-heart-svg {
-    width: 100%;
-    height: 100%;
-    overflow: visible;
+@keyframes hsFlash {
+    0% { filter: brightness(1); transform: scale(1); }
+    40% { filter: brightness(1.7) drop-shadow(0 0 22px #ff4d6d); transform: scale(1.15); }
+    100% { filter: brightness(1); transform: scale(1); }
 }
 .hs-pulse {
-    animation: hs-beat var(--hs-speed, 1.1s) ease-in-out infinite;
-    transform-origin: center;
+    animation: hsBeat var(--hs-spd, 1.1s) ease-in-out infinite;
+    transform-origin: 50% 50%;
 }
-@keyframes hs-beat {
-    0%, 100% { transform: scale(1); }
-    12% { transform: scale(1.07); }
-    24% { transform: scale(1); }
-    36% { transform: scale(1.04); }
-    48% { transform: scale(1); }
+@keyframes hsBeat {
+    0%,100% { transform: scale(1); }
+    15% { transform: scale(1.08); }
+    30% { transform: scale(1); }
+    45% { transform: scale(1.05); }
+    60% { transform: scale(1); }
 }
-.hs-ecg-line {
+.hs-ecg {
     fill: none;
     stroke-linecap: round;
-    stroke-dasharray: 4 3;
-    animation: hs-ecg 1.4s linear infinite;
+    stroke-dasharray: 5 3;
+    animation: hsEcg 1.35s linear infinite;
 }
-@keyframes hs-ecg {
-    to { stroke-dashoffset: -28; }
+@keyframes hsEcg { to { stroke-dashoffset: -30; } }
+
+#hs-panel-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 999998;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
 }
-.hs-score-text {
-    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-    font-weight: 700;
-    fill: #fff;
-    pointer-events: none;
-}
+#hs-panel-overlay.open { display: flex; }
 
 #hs-panel {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: min(380px, 94vw);
-    max-height: 80vh;
+    width: min(360px, 94vw);
+    max-height: 78vh;
     overflow-y: auto;
-    background: rgba(16, 12, 18, 0.92);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 60, 90, 0.25);
-    border-radius: 14px;
-    z-index: 1000000;
-    padding: 16px;
-    color: #e8e0e4;
+    background: rgba(14,10,16,0.95);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,70,100,0.28);
+    border-radius: 16px;
+    padding: 18px 16px 16px;
+    color: #eae2e6;
     font-family: system-ui, sans-serif;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.55);
-    display: none;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
 }
-#hs-panel.open { display: block; }
-.hs-panel-header {
+.hs-head {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 14px;
     font-weight: 700;
-    font-size: 16px;
+    font-size: 17px;
     color: #ff6b8a;
 }
-.hs-close {
+.hs-x {
     background: none;
     border: none;
-    color: #aaa;
-    font-size: 20px;
+    color: #999;
+    font-size: 24px;
+    line-height: 1;
     cursor: pointer;
+    padding: 0 4px;
 }
-.hs-section { margin-bottom: 14px; }
-.hs-section-title {
+.hs-big {
+    font-size: 32px;
+    font-weight: 800;
+    color: #ff6b8a;
+    margin: 4px 0 2px;
+}
+.hs-sub {
+    font-size: 12px;
+    opacity: 0.65;
+    margin-bottom: 14px;
+}
+.hs-sec {
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
-    opacity: 0.5;
-    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+    opacity: 0.45;
+    margin: 12px 0 6px;
 }
-.hs-btn {
-    background: linear-gradient(135deg, #ff4d6d, #c9184a);
-    border: none;
-    color: white;
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    width: 100%;
-    margin-top: 6px;
-}
-.hs-btn.active {
-    background: linear-gradient(135deg, #2a9d8f, #1d6f66);
-}
-.hs-milestone {
+.hs-row {
     display: flex;
     justify-content: space-between;
-    padding: 5px 0;
-    font-size: 13px;
+    padding: 6px 0;
+    font-size: 14px;
     border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-.hs-milestone.done { opacity: 0.45; text-decoration: line-through; }
-.hs-npc-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 13px;
-    padding: 4px 0;
+.hs-row.done { opacity: 0.4; text-decoration: line-through; }
+.hs-btn {
+    margin-top: 16px;
+    width: 100%;
+    padding: 11px;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    background: linear-gradient(135deg, #ff4d6d, #c9184a);
+    color: #fff;
 }
-.hs-type {
-    font-size: 12px;
-    opacity: 0.7;
-    margin-top: 2px;
+.hs-btn.on {
+    background: linear-gradient(135deg, #2a9d8f, #1a6b63);
 }
 `;
-    document.head.appendChild(el);
+    document.head.appendChild(s);
 }
 
-// ===================== ЦВЕТА =====================
-function getVisualState(score) {
+// ===================== ВИЗУАЛ =====================
+function state(score) {
     const s = Math.max(0, Math.min(100, score));
-    if (s <= 20) return { hue: 210, sat: 25, light: 35, speed: 1.6, glow: 0.15, label: 'холод' };
-    if (s <= 50) return { hue: 0, sat: 55, light: 38, speed: 1.15, glow: 0.35, label: 'тёплый' };
-    if (s <= 80) return { hue: 350, sat: 80, light: 48, speed: 0.85, glow: 0.65, label: 'горячий' };
-    return { hue: 0, sat: 95, light: 52, speed: 0.55, glow: 0.95, label: 'огонь' };
+    if (s <= 20) return { h: 210, sat: 30, l: 36, spd: 1.55, name: 'холод' };
+    if (s <= 50) return { h: 0, sat: 60, l: 40, spd: 1.15, name: 'тёплый' };
+    if (s <= 80) return { h: 350, sat: 82, l: 48, spd: 0.82, name: 'горячий' };
+    return { h: 0, sat: 95, l: 52, spd: 0.52, name: 'огонь' };
 }
 
-// ===================== SVG =====================
-function buildHeartSVG(score) {
-    const st = getVisualState(score);
-    const fill = `hsl(${st.hue}, ${st.sat}%, ${st.light}%)`;
-    const vessel = `hsl(${st.hue}, ${Math.min(100, st.sat + 15)}%, ${Math.min(70, st.light + 18)}%)`;
+function heartSVG(score) {
+    const st = state(score);
+    const fill = `hsl(\( {st.h}, \){st.sat}%,${st.l}%)`;
+    const line = `hsl(\( {st.h}, \){Math.min(100, st.sat + 10)}%,${Math.min(68, st.l + 15)}%)`;
+    const fillH = (score / 100) * 82;
 
-    return `
-<svg class="hs-heart-svg hs-pulse" style="--hs-speed:${st.speed}s" viewBox="0 0 100 115" xmlns="http://www.w3.org/2000/svg">
+    return `<svg class="hs-pulse" style="--hs-spd:${st.spd}s" viewBox="0 0 100 112" width="100%" height="100%">
   <defs>
-    <filter id="hs-inner-glow" x="-40%" y="-40%" width="180%" height="180%">
-      <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
-      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <linearGradient id="hs-glass" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/>
-      <stop offset="50%" stop-color="rgba(255,255,255,0.04)"/>
-      <stop offset="100%" stop-color="rgba(0,0,0,0.15)"/>
+    <clipPath id="hc"><path d="M50 96C50 96 14 70 14 43C14 26 27 14 42 14C47 14 50 18 50 18C50 18 53 14 58 14C73 14 86 26 86 43C86 70 50 96 50 96Z"/></clipPath>
+    <linearGradient id="gl" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.2)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.12)"/>
     </linearGradient>
-    <clipPath id="hs-clip">
-      <path d="M50 98 C50 98 12 70 12 42 C12 24 26 12 42 12 C48 12 50 16 50 16 C50 16 52 12 58 12 C74 12 88 24 88 42 C88 70 50 98 50 98 Z"/>
-    </clipPath>
   </defs>
-
-  <path d="M50 98 C50 98 12 70 12 42 C12 24 26 12 42 12 C48 12 50 16 50 16 C50 16 52 12 58 12 C74 12 88 24 88 42 C88 70 50 98 50 98 Z"
-        fill="rgba(18,10,14,0.75)" stroke="rgba(255,80,110,0.35)" stroke-width="1.8"/>
-
-  <rect x="0" y="\( {98 - (score / 100) * 86}" width="100" height=" \){(score / 100) * 86}"
-        clip-path="url(#hs-clip)" fill="${fill}" opacity="0.82" filter="url(#hs-inner-glow)"/>
-
-  <g fill="none" stroke="${vessel}" stroke-width="1.1" opacity="0.85">
-    <path d="M38 38 Q45 48 42 62"/>
-    <path d="M62 36 Q55 50 58 64"/>
-    <path d="M50 28 Q48 45 50 70"/>
-    <path d="M32 52 Q40 58 48 55"/>
-    <path d="M68 50 Q60 58 52 56"/>
-    <path d="M44 72 Q50 78 56 72"/>
+  <path d="M50 96C50 96 14 70 14 43C14 26 27 14 42 14C47 14 50 18 50 18C50 18 53 14 58 14C73 14 86 26 86 43C86 70 50 96 50 96Z"
+        fill="rgba(16,8,12,0.8)" stroke="rgba(255,80,110,0.4)" stroke-width="1.7"/>
+  <rect x="0" y="\( {96 - fillH}" width="100" height=" \){fillH}" clip-path="url(#hc)" fill="${fill}" opacity="0.85"/>
+  <g fill="none" stroke="${line}" stroke-width="1.15" opacity="0.9">
+    <path d="M37 37Q45 48 42 61"/><path d="M63 35Q55 49 58 63"/>
+    <path d="M50 27Q48 44 50 68"/><path d="M33 51Q41 57 48 54"/>
+    <path d="M67 49Q59 57 52 55"/>
   </g>
-
-  <path d="M50 98 C50 98 12 70 12 42 C12 24 26 12 42 12 C48 12 50 16 50 16 C50 16 52 12 58 12 C74 12 88 24 88 42 C88 70 50 98 50 98 Z"
-        fill="url(#hs-glass)" opacity="0.55"/>
-
-  <polyline class="hs-ecg-line" points="22,78 30,78 34,68 38,88 42,78 55,78 59,70 63,86 67,78 78,78"
-            stroke="${vessel}" stroke-width="1.3" opacity="0.9"/>
-
-  <text class="hs-score-text" x="50" y="52" text-anchor="middle" font-size="17">${Math.round(score)}</text>
-  <text class="hs-score-text" x="50" y="64" text-anchor="middle" font-size="8" opacity="0.7">%</text>
+  <path d="M50 96C50 96 14 70 14 43C14 26 27 14 42 14C47 14 50 18 50 18C50 18 53 14 58 14C73 14 86 26 86 43C86 70 50 96 50 96Z"
+        fill="url(#gl)" opacity="0.5"/>
+  <polyline class="hs-ecg" points="20,76 29,76 33,66 37,86 41,76 54,76 58,68 62,84 66,76 80,76"
+            stroke="${line}" stroke-width="1.35" opacity="0.95"/>
+  <text x="50" y="51" text-anchor="middle" fill="#fff" font-size="16" font-weight="700"
+        font-family="monospace">${Math.round(score)}</text>
+  <text x="50" y="62" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="8"
+        font-family="monospace">%</text>
 </svg>`;
 }
 
@@ -290,20 +246,19 @@ function updateWidget() {
         w = document.createElement('div');
         w.id = 'hs-widget';
         document.body.appendChild(w);
-        makeDraggable(w);
-        w.addEventListener('dblclick', openPanel);
+        setupDragAndTap(w);
     }
-    w.innerHTML = buildHeartSVG(c.score);
+    w.innerHTML = heartSVG(c.score);
 
-    if (c.widgetPos?.top != null) {
+    if (c.widgetPos?.top) {
         w.style.top = c.widgetPos.top;
         w.style.left = c.widgetPos.left;
-        w.style.bottom = 'auto';
         w.style.right = 'auto';
+        w.style.bottom = 'auto';
     }
 }
 
-function flashWidget() {
+function flash() {
     const w = document.getElementById('hs-widget');
     if (!w) return;
     w.classList.remove('hs-flash');
@@ -311,34 +266,49 @@ function flashWidget() {
     w.classList.add('hs-flash');
 }
 
-function makeDraggable(el) {
-    let drag = false, ox = 0, oy = 0, moved = false;
+function setupDragAndTap(el) {
+    let dragging = false, moved = false, ox = 0, oy = 0;
+    let lastTap = 0;
+
     el.addEventListener('pointerdown', e => {
         const r = el.getBoundingClientRect();
         ox = e.clientX - r.left;
         oy = e.clientY - r.top;
-        drag = true;
+        dragging = true;
         moved = false;
         el.setPointerCapture(e.pointerId);
         e.preventDefault();
     });
+
     el.addEventListener('pointermove', e => {
-        if (!drag) return;
-        const dx = Math.abs(e.clientX - (el.getBoundingClientRect().left + ox));
-        const dy = Math.abs(e.clientY - (el.getBoundingClientRect().top + oy));
-        if (dx > 4 || dy > 4) moved = true;
+        if (!dragging) return;
+        if (Math.abs(e.clientX - (el.getBoundingClientRect().left + ox)) > 5 ||
+            Math.abs(e.clientY - (el.getBoundingClientRect().top + oy)) > 5) {
+            moved = true;
+        }
         if (!moved) return;
-        el.style.left = Math.max(6, Math.min(window.innerWidth - 100, e.clientX - ox)) + 'px';
-        el.style.top = Math.max(6, Math.min(window.innerHeight - 120, e.clientY - oy)) + 'px';
+        el.style.left = Math.max(4, Math.min(window.innerWidth - 90, e.clientX - ox)) + 'px';
+        el.style.top = Math.max(4, Math.min(window.innerHeight - 110, e.clientY - oy)) + 'px';
         el.style.right = 'auto';
         el.style.bottom = 'auto';
     });
+
     el.addEventListener('pointerup', () => {
-        if (!drag) return;
-        drag = false;
+        if (!dragging) return;
+        dragging = false;
         if (moved) {
             cfg().widgetPos = { top: el.style.top, left: el.style.left };
             save();
+            return;
+        }
+        // тап
+        const now = Date.now();
+        if (now - lastTap < 320) {
+            // двойной тап
+            lastTap = 0;
+            openPanel();
+        } else {
+            lastTap = now;
         }
     });
 }
@@ -349,151 +319,146 @@ const RE_EVENT = /{{HS::EVENT:([^}]+)}}/gi;
 const RE_TYPE = /{{HS::TYPE:([^}]+)}}/gi;
 const RE_NPC = /{{HS::NPC:([^:]+):(\d{1,3})}}/gi;
 
-function parseMessage(text) {
+function parse(text) {
     if (!text) return;
     const c = cfg();
-    let changed = false;
+    let ch = false;
 
     const syncs = [...text.matchAll(RE_SYNC)];
     if (syncs.length) {
-        const val = Math.max(0, Math.min(100, parseInt(syncs[syncs.length - 1][1], 10)));
-        if (!isNaN(val) && val !== c.score) {
+        const v = Math.max(0, Math.min(100, parseInt(syncs.at(-1)[1], 10)));
+        if (!isNaN(v) && v !== c.score) {
             const old = c.score;
-            c.score = val;
-            changed = true;
+            c.score = v;
+            ch = true;
             c.milestones.forEach(m => {
                 if (!m.done && c.score >= m.threshold) {
                     m.done = true;
-                    flashWidget();
-                    try { toastr.success(`Достижение: ${m.name}`, 'Heartbeat Sync'); } catch {}
+                    flash();
+                    try { toastr.success('Достижение: ' + m.name, 'Heartbeat Sync'); } catch {}
                 }
             });
-            if (Math.abs(val - old) >= 12) flashWidget();
+            if (Math.abs(v - old) >= 12) flash();
         }
     }
 
     const types = [...text.matchAll(RE_TYPE)];
     if (types.length) {
-        c.relationType = types[types.length - 1][1].trim().toLowerCase();
-        changed = true;
+        c.relationType = types.at(-1)[1].trim().toLowerCase();
+        ch = true;
     }
 
-    const events = [...text.matchAll(RE_EVENT)];
-    if (events.length) {
-        flashWidget();
-        try { toastr.info(`Событие: ${events[events.length - 1][1].trim()}`, 'Heartbeat Sync'); } catch {}
-        changed = true;
+    const evs = [...text.matchAll(RE_EVENT)];
+    if (evs.length) {
+        flash();
+        try { toastr.info('Событие: ' + evs.at(-1)[1].trim(), 'Heartbeat Sync'); } catch {}
+        ch = true;
     }
 
-    const npcs = [...text.matchAll(RE_NPC)];
-    npcs.forEach(m => {
+    [...text.matchAll(RE_NPC)].forEach(m => {
         const name = m[1].trim();
         const sc = Math.max(0, Math.min(100, parseInt(m[2], 10)));
-        let npc = c.npcs.find(n => n.name.toLowerCase() === name.toLowerCase());
-        if (!npc) {
-            npc = { name, score: sc, type: 'neutral' };
-            c.npcs.push(npc);
-        } else {
-            npc.score = sc;
-        }
-        changed = true;
+        let n = c.npcs.find(x => x.name.toLowerCase() === name.toLowerCase());
+        if (!n) c.npcs.push({ name, score: sc });
+        else n.score = sc;
+        ch = true;
     });
 
-    if (changed) {
+    if (ch) {
         save();
         updateWidget();
-        if (document.getElementById('hs-panel')?.classList.contains('open')) renderPanel();
+        if (document.getElementById('hs-panel-overlay')?.classList.contains('open')) renderPanel();
     }
 }
 
 function startObserver() {
     const chat = document.getElementById('chat');
     if (!chat) return;
-    const obs = new MutationObserver(muts => {
+    new MutationObserver(muts => {
         for (const m of muts) {
-            for (const node of m.addedNodes) {
-                if (node.nodeType !== 1) continue;
-                const txt = node.querySelector?.('.mes_text')?.textContent || node.textContent;
-                if (txt) parseMessage(txt);
+            for (const n of m.addedNodes) {
+                if (n.nodeType !== 1) continue;
+                const t = n.querySelector?.('.mes_text')?.textContent || n.textContent;
+                if (t) parse(t);
             }
         }
-    });
-    obs.observe(chat, { childList: true, subtree: true });
+    }).observe(chat, { childList: true, subtree: true });
 }
 
 // ===================== ПАНЕЛЬ =====================
 function openPanel() {
-    let p = document.getElementById('hs-panel');
-    if (!p) {
-        p = document.createElement('div');
-        p.id = 'hs-panel';
-        document.body.appendChild(p);
+    let ov = document.getElementById('hs-panel-overlay');
+    if (!ov) {
+        ov = document.createElement('div');
+        ov.id = 'hs-panel-overlay';
+        ov.innerHTML = '<div id="hs-panel"></div>';
+        document.body.appendChild(ov);
+        ov.addEventListener('click', e => {
+            if (e.target === ov) closePanel();
+        });
     }
-    p.classList.add('open');
+    ov.classList.add('open');
     renderPanel();
 }
 
 function closePanel() {
-    document.getElementById('hs-panel')?.classList.remove('open');
+    document.getElementById('hs-panel-overlay')?.classList.remove('open');
 }
 
 function renderPanel() {
     const c = cfg();
-    const p = document.getElementById('hs-panel');
-    if (!p) return;
-    const st = getVisualState(c.score);
+    const box = document.getElementById('hs-panel');
+    if (!box) return;
+    const st = state(c.score);
 
-    p.innerHTML = `
-        <div class="hs-panel-header">
+    box.innerHTML = `
+        <div class="hs-head">
             <span>Heartbeat Sync</span>
-            <button class="hs-close" id="hs-close-btn">×</button>
+            <button class="hs-x" id="hs-x">×</button>
         </div>
-        <div class="hs-section">
-            <div class="hs-section-title">Текущая синхронизация</div>
-            <div style="font-size:28px;font-weight:700;color:#ff6b8a">${c.score}%</div>
-            <div class="hs-type">${c.relationType} · ${st.label}</div>
-        </div>
-        <div class="hs-section">
-            <div class="hs-section-title">Достижения</div>
-            ${c.milestones.map(m => `
-                <div class="hs-milestone ${m.done ? 'done' : ''}">
-                    <span>${m.name}</span>
-                    <span>${m.threshold}%</span>
-                </div>
-            `).join('')}
-        </div>
+        <div class="hs-big">${c.score}%</div>
+        <div class="hs-sub">${c.relationType} · ${st.name}</div>
+
+        <div class="hs-sec">Достижения</div>
+        ${c.milestones.map(m => `
+            <div class="hs-row ${m.done ? 'done' : ''}">
+                <span>${m.name}</span>
+                <span>${m.threshold}%</span>
+            </div>
+        `).join('')}
+
         ${c.npcs.length ? `
-        <div class="hs-section">
-            <div class="hs-section-title">Другие связи</div>
+            <div class="hs-sec">Другие связи</div>
             ${c.npcs.map(n => `
-                <div class="hs-npc-row">
+                <div class="hs-row">
                     <span>${n.name}</span>
                     <span>${n.score}%</span>
                 </div>
             `).join('')}
-        </div>` : ''}
-        <button class="hs-btn ${c.sensorsActive ? 'active' : ''}" id="hs-activate-btn">
+        ` : ''}
+
+        <button class="hs-btn ${c.sensorsActive ? 'on' : ''}" id="hs-act">
             ${c.sensorsActive ? 'Sensors Active' : 'Activate Sensors'}
         </button>
     `;
 
-    document.getElementById('hs-close-btn').onclick = closePanel;
-    document.getElementById('hs-activate-btn').onclick = () => {
+    document.getElementById('hs-x').onclick = closePanel;
+    document.getElementById('hs-act').onclick = () => {
         c.sensorsActive = true;
         save();
         startObserver();
-        try { toastr.success('Сенсоры активны. Инструкция автоматически добавляется в промпт.', 'Heartbeat Sync'); } catch {}
+        try { toastr.success('Сенсоры включены. Инструкция идёт в промпт автоматически.', 'Heartbeat Sync'); } catch {}
         renderPanel();
     };
 }
 
 // ===================== WAND =====================
-function registerWand() {
-    if (document.getElementById('hs-wand-item')) return true;
+function addWand() {
+    if (document.getElementById('hs-wand')) return true;
     const menu = document.getElementById('extensionsMenu');
     if (!menu) return false;
     const item = document.createElement('div');
-    item.id = 'hs-wand-item';
+    item.id = 'hs-wand';
     item.className = 'list-group-item flex-container flexGap5 interactable';
     item.innerHTML = '<i class="fa-solid fa-heart-pulse" style="color:#ff4d6d"></i><span>Heartbeat Sync</span>';
     item.onclick = openPanel;
@@ -507,34 +472,29 @@ jQuery(() => {
         injectStyles();
         updateWidget();
 
-        if (!registerWand()) {
-            let tries = 0;
-            const iv = setInterval(() => {
-                if (registerWand() || ++tries > 30) clearInterval(iv);
-            }, 300);
+        if (!addWand()) {
+            let t = 0;
+            const iv = setInterval(() => { if (addWand() || ++t > 25) clearInterval(iv); }, 300);
         }
 
-        // Авто-инъекция в промпт
-        if (event_types?.CHAT_COMPLETION_PROMPT_READY) {
-            eventSource.on(event_types.CHAT_COMPLETION_PROMPT_READY, injectHeartbeatPrompt);
-        }
-        if (event_types?.GENERATE_AFTER_COMBINING_PROMPTS) {
-            eventSource.on(event_types.GENERATE_AFTER_COMBINING_PROMPTS, injectHeartbeatPrompt);
-        }
+        if (event_types?.CHAT_COMPLETION_PROMPT_READY)
+            eventSource.on(event_types.CHAT_COMPLETION_PROMPT_READY, injectPrompt);
+        if (event_types?.GENERATE_AFTER_COMBINING_PROMPTS)
+            eventSource.on(event_types.GENERATE_AFTER_COMBINING_PROMPTS, injectPrompt);
 
         if (event_types?.MESSAGE_RECEIVED) {
             eventSource.on(event_types.MESSAGE_RECEIVED, () => {
                 setTimeout(() => {
                     const last = document.querySelector('#chat .mes:last-child .mes_text');
-                    if (last) parseMessage(last.textContent);
-                }, 350);
+                    if (last) parse(last.textContent);
+                }, 300);
             });
         }
 
         if (cfg().sensorsActive) startObserver();
 
-        console.log('[Heartbeat Sync] v1.3 loaded — auto prompt injection enabled');
+        console.log('[Heartbeat Sync] fixed version loaded');
     } catch (e) {
-        console.error('[Heartbeat Sync]', e);
+        console.error('[HS]', e);
     }
 });
