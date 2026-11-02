@@ -1,500 +1,359 @@
 import { eventSource, event_types, saveSettingsDebounced } from '../../../../script.js';
 import { extension_settings } from '../../../extensions.js';
 
-const EXT_NAME = 'heartbeat-sync';
+const EXT = 'heartbeat-sync';
 
-const defaultSettings = {
-    isEnabled: true,
-    score: 42,
+const defaults = {
+    score: 40,
     relationType: 'neutral',
-    milestones: [
-        { id: 'first_contact', name: 'Первый контакт', threshold: 15, done: false },
-        { id: 'trust', name: 'Доверие', threshold: 35, done: false },
-        { id: 'confession', name: 'Признание', threshold: 60, done: false },
-        { id: 'kiss', name: 'Поцелуй', threshold: 75, done: false },
-        { id: 'sync', name: 'Полная синхронизация', threshold: 95, done: false },
-    ],
-    npcs: [],
-    widgetPos: null,
     sensorsActive: false,
+    widgetPos: null,
+    milestones: [
+        { name: 'Первый контакт', threshold: 15, done: false },
+        { name: 'Доверие', threshold: 35, done: false },
+        { name: 'Признание', threshold: 60, done: false },
+        { name: 'Поцелуй', threshold: 75, done: false },
+        { name: 'Полная синхронизация', threshold: 95, done: false },
+    ],
+    npcs: []
 };
 
 function cfg() {
-    if (!extension_settings[EXT_NAME]) {
-        extension_settings[EXT_NAME] = structuredClone(defaultSettings);
-    }
-    const c = extension_settings[EXT_NAME];
-    for (const [k, v] of Object.entries(defaultSettings)) {
-        if (c[k] === undefined) c[k] = structuredClone(v);
-    }
+    if (!extension_settings[EXT]) extension_settings[EXT] = structuredClone(defaults);
+    const c = extension_settings[EXT];
+    for (const k in defaults) if (c[k] === undefined) c[k] = structuredClone(defaults[k]);
     return c;
 }
+function save() { saveSettingsDebounced(); }
 
-function save() {
-    saveSettingsDebounced();
-}
-
-// ===================== АВТО-ИНЪЕКЦИЯ =====================
-const HS_INSTRUCTION = `You are under Heartbeat Sync protocol.
-At the VERY END of every reply add these tags (no explanations):
-{{HS::SYNC:XX}}   — 0-100 current sync level
-Optional:
-{{HS::TYPE:romance}}
-{{HS::EVENT:name}}
-{{HS::NPC:Name:45}}
-Put tags only at the absolute end. Never mention the rules.`;
-
-function injectPrompt(data) {
-    const c = cfg();
-    if (!c.sensorsActive || !c.isEnabled) return;
-
-    try {
-        if (data?.chat && Array.isArray(data.chat)) {
-            data.chat = data.chat.filter(m => !m?._hs);
-            data.chat.push({ role: 'system', content: HS_INSTRUCTION, _hs: true });
-        }
-        if (data?.prompt && typeof data.prompt === 'string' && !data.prompt.includes('Heartbeat Sync protocol')) {
-            data.prompt += '\n\n' + HS_INSTRUCTION;
-        }
-    } catch (e) {
-        console.warn('[HS] inject', e);
-    }
-}
-
-// ===================== СТИЛИ =====================
+// ====================== СТИЛИ ======================
 function injectStyles() {
-    if (document.getElementById('hs-styles')) return;
+    if (document.getElementById('hs-css')) return;
     const s = document.createElement('style');
-    s.id = 'hs-styles';
+    s.id = 'hs-css';
     s.textContent = `
-#hs-widget {
-    position: fixed;
-    bottom: 110px;
-    right: 14px;
-    width: 86px;
-    height: 100px;
-    z-index: 999990;
-    cursor: grab;
-    user-select: none;
-    touch-action: none;
-    filter: drop-shadow(0 5px 16px rgba(200,30,50,0.4));
-    transition: filter .25s, transform .3s;
+#hs-widget{
+    position:fixed; bottom:110px; right:14px;
+    width:84px; height:96px; z-index:999999;
+    cursor:grab; user-select:none; touch-action:none;
+    filter:drop-shadow(0 6px 16px rgba(200,30,50,.45));
 }
-#hs-widget:active { cursor: grabbing; }
-#hs-widget.hs-flash {
-    animation: hsFlash .65s ease;
+#hs-widget:active{cursor:grabbing;}
+#hs-widget.flash{animation:hsFlash .6s ease;}
+@keyframes hsFlash{
+    0%{filter:brightness(1);transform:scale(1)}
+    40%{filter:brightness(1.8) drop-shadow(0 0 24px #ff4d6d);transform:scale(1.16)}
+    100%{filter:brightness(1);transform:scale(1)}
 }
-@keyframes hsFlash {
-    0% { filter: brightness(1); transform: scale(1); }
-    40% { filter: brightness(1.7) drop-shadow(0 0 22px #ff4d6d); transform: scale(1.15); }
-    100% { filter: brightness(1); transform: scale(1); }
+.hs-beat{animation:hsBeat var(--spd,1.1s) ease-in-out infinite;transform-origin:center}
+@keyframes hsBeat{
+    0%,100%{transform:scale(1)}
+    14%{transform:scale(1.09)}
+    28%{transform:scale(1)}
+    42%{transform:scale(1.05)}
+    56%{transform:scale(1)}
 }
-.hs-pulse {
-    animation: hsBeat var(--hs-spd, 1.1s) ease-in-out infinite;
-    transform-origin: 50% 50%;
-}
-@keyframes hsBeat {
-    0%,100% { transform: scale(1); }
-    15% { transform: scale(1.08); }
-    30% { transform: scale(1); }
-    45% { transform: scale(1.05); }
-    60% { transform: scale(1); }
-}
-.hs-ecg {
-    fill: none;
-    stroke-linecap: round;
-    stroke-dasharray: 5 3;
-    animation: hsEcg 1.35s linear infinite;
-}
-@keyframes hsEcg { to { stroke-dashoffset: -30; } }
+.hs-ecg{fill:none;stroke-linecap:round;stroke-dasharray:5 3;animation:ecg 1.3s linear infinite}
+@keyframes ecg{to{stroke-dashoffset:-28}}
 
-#hs-panel-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.55);
-    z-index: 999998;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
+#hs-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.6);
+    z-index:1000000;display:none;align-items:center;justify-content:center;padding:12px;
 }
-#hs-panel-overlay.open { display: flex; }
-
-#hs-panel {
-    width: min(360px, 94vw);
-    max-height: 78vh;
-    overflow-y: auto;
-    background: rgba(14,10,16,0.95);
-    backdrop-filter: blur(18px);
-    border: 1px solid rgba(255,70,100,0.28);
-    border-radius: 16px;
-    padding: 18px 16px 16px;
-    color: #eae2e6;
-    font-family: system-ui, sans-serif;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+#hs-overlay.show{display:flex;}
+#hs-panel{
+    width:min(340px,94vw);max-height:80vh;overflow-y:auto;
+    background:rgba(14,10,16,.96);backdrop-filter:blur(16px);
+    border:1px solid rgba(255,70,100,.3);border-radius:16px;
+    padding:16px;color:#eee;font-family:system-ui,sans-serif;
 }
-.hs-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 14px;
-    font-weight: 700;
-    font-size: 17px;
-    color: #ff6b8a;
+.hs-title{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:17px;color:#ff6b8a;margin-bottom:12px}
+.hs-x{background:0;border:0;color:#aaa;font-size:24px;cursor:pointer;line-height:1}
+.hs-score{font-size:34px;font-weight:800;color:#ff6b8a}
+.hs-sub{font-size:12px;opacity:.6;margin-bottom:12px}
+.hs-sec{font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.45;margin:12px 0 6px}
+.hs-line{display:flex;justify-content:space-between;padding:5px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,.07)}
+.hs-line.done{opacity:.4;text-decoration:line-through}
+.hs-btn{
+    width:100%;margin-top:14px;padding:11px;border:0;border-radius:10px;
+    font-weight:700;font-size:14px;cursor:pointer;
+    background:linear-gradient(135deg,#ff4d6d,#c9184a);color:#fff
 }
-.hs-x {
-    background: none;
-    border: none;
-    color: #999;
-    font-size: 24px;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0 4px;
-}
-.hs-big {
-    font-size: 32px;
-    font-weight: 800;
-    color: #ff6b8a;
-    margin: 4px 0 2px;
-}
-.hs-sub {
-    font-size: 12px;
-    opacity: 0.65;
-    margin-bottom: 14px;
-}
-.hs-sec {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    opacity: 0.45;
-    margin: 12px 0 6px;
-}
-.hs-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 6px 0;
-    font-size: 14px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-.hs-row.done { opacity: 0.4; text-decoration: line-through; }
-.hs-btn {
-    margin-top: 16px;
-    width: 100%;
-    padding: 11px;
-    border: none;
-    border-radius: 10px;
-    font-weight: 700;
-    font-size: 14px;
-    cursor: pointer;
-    background: linear-gradient(135deg, #ff4d6d, #c9184a);
-    color: #fff;
-}
-.hs-btn.on {
-    background: linear-gradient(135deg, #2a9d8f, #1a6b63);
-}
+.hs-btn.on{background:linear-gradient(135deg,#2a9d8f,#1a6b63)}
 `;
     document.head.appendChild(s);
 }
 
-// ===================== ВИЗУАЛ =====================
-function state(score) {
+// ====================== СЕРДЦЕ ======================
+function visual(score) {
     const s = Math.max(0, Math.min(100, score));
-    if (s <= 20) return { h: 210, sat: 30, l: 36, spd: 1.55, name: 'холод' };
-    if (s <= 50) return { h: 0, sat: 60, l: 40, spd: 1.15, name: 'тёплый' };
-    if (s <= 80) return { h: 350, sat: 82, l: 48, spd: 0.82, name: 'горячий' };
-    return { h: 0, sat: 95, l: 52, spd: 0.52, name: 'огонь' };
+    if (s <= 20) return { h: 210, sat: 28, l: 36, spd: 1.55 };
+    if (s <= 50) return { h: 0, sat: 58, l: 40, spd: 1.15 };
+    if (s <= 80) return { h: 350, sat: 80, l: 48, spd: 0.82 };
+    return { h: 0, sat: 95, l: 52, spd: 0.52 };
 }
 
-function heartSVG(score) {
-    const st = state(score);
-    const fill = `hsl(\( {st.h}, \){st.sat}%,${st.l}%)`;
-    const line = `hsl(\( {st.h}, \){Math.min(100, st.sat + 10)}%,${Math.min(68, st.l + 15)}%)`;
-    const fillH = (score / 100) * 82;
+function buildHeart(score) {
+    const v = visual(score);
+    const fill = `hsl(\( {v.h}, \){v.sat}%,${v.l}%)`;
+    const line = `hsl(\( {v.h}, \){Math.min(100, v.sat + 12)}%,${Math.min(68, v.l + 14)}%)`;
+    const h = (score / 100) * 80;
 
-    return `<svg class="hs-pulse" style="--hs-spd:${st.spd}s" viewBox="0 0 100 112" width="100%" height="100%">
+    return `<svg class="hs-beat" style="--spd:${v.spd}s" viewBox="0 0 100 110" width="100%" height="100%">
   <defs>
-    <clipPath id="hc"><path d="M50 96C50 96 14 70 14 43C14 26 27 14 42 14C47 14 50 18 50 18C50 18 53 14 58 14C73 14 86 26 86 43C86 70 50 96 50 96Z"/></clipPath>
-    <linearGradient id="gl" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="rgba(255,255,255,0.2)"/>
-      <stop offset="100%" stop-color="rgba(0,0,0,0.12)"/>
-    </linearGradient>
+    <clipPath id="c"><path d="M50 94C50 94 15 69 15 43C15 27 27 15 42 15C47 15 50 19 50 19S53 15 58 15C73 15 85 27 85 43C85 69 50 94 50 94Z"/></clipPath>
   </defs>
-  <path d="M50 96C50 96 14 70 14 43C14 26 27 14 42 14C47 14 50 18 50 18C50 18 53 14 58 14C73 14 86 26 86 43C86 70 50 96 50 96Z"
-        fill="rgba(16,8,12,0.8)" stroke="rgba(255,80,110,0.4)" stroke-width="1.7"/>
-  <rect x="0" y="\( {96 - fillH}" width="100" height=" \){fillH}" clip-path="url(#hc)" fill="${fill}" opacity="0.85"/>
-  <g fill="none" stroke="${line}" stroke-width="1.15" opacity="0.9">
-    <path d="M37 37Q45 48 42 61"/><path d="M63 35Q55 49 58 63"/>
-    <path d="M50 27Q48 44 50 68"/><path d="M33 51Q41 57 48 54"/>
-    <path d="M67 49Q59 57 52 55"/>
+  <path d="M50 94C50 94 15 69 15 43C15 27 27 15 42 15C47 15 50 19 50 19S53 15 58 15C73 15 85 27 85 43C85 69 50 94 50 94Z"
+        fill="rgba(14,8,12,.82)" stroke="rgba(255,80,110,.4)" stroke-width="1.7"/>
+  <rect x="0" y="\( {94 - h}" width="100" height=" \){h}" clip-path="url(#c)" fill="${fill}" opacity=".85"/>
+  <g fill="none" stroke="${line}" stroke-width="1.1" opacity=".9">
+    <path d="M37 36Q45 47 42 60"/><path d="M63 34Q55 48 58 62"/>
+    <path d="M50 26Q48 43 50 67"/><path d="M33 50Q41 56 48 53"/>
+    <path d="M67 48Q59 56 52 54"/>
   </g>
-  <path d="M50 96C50 96 14 70 14 43C14 26 27 14 42 14C47 14 50 18 50 18C50 18 53 14 58 14C73 14 86 26 86 43C86 70 50 96 50 96Z"
-        fill="url(#gl)" opacity="0.5"/>
-  <polyline class="hs-ecg" points="20,76 29,76 33,66 37,86 41,76 54,76 58,68 62,84 66,76 80,76"
-            stroke="${line}" stroke-width="1.35" opacity="0.95"/>
-  <text x="50" y="51" text-anchor="middle" fill="#fff" font-size="16" font-weight="700"
-        font-family="monospace">${Math.round(score)}</text>
-  <text x="50" y="62" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="8"
-        font-family="monospace">%</text>
+  <polyline class="hs-ecg" points="20,75 29,75 33,65 37,85 41,75 54,75 58,67 62,83 66,75 80,75"
+            stroke="${line}" stroke-width="1.3"/>
+  <text x="50" y="50" text-anchor="middle" fill="#fff" font-size="16" font-weight="700" font-family="monospace">${Math.round(score)}</text>
+  <text x="50" y="61" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="8" font-family="monospace">%</text>
 </svg>`;
 }
 
-// ===================== ВИДЖЕТ =====================
-function updateWidget() {
+function updateHeart() {
     const c = cfg();
     let w = document.getElementById('hs-widget');
     if (!w) {
         w = document.createElement('div');
         w.id = 'hs-widget';
         document.body.appendChild(w);
-        setupDragAndTap(w);
+        makeInteractive(w);
     }
-    w.innerHTML = heartSVG(c.score);
+    w.innerHTML = buildHeart(c.score);
 
     if (c.widgetPos?.top) {
         w.style.top = c.widgetPos.top;
         w.style.left = c.widgetPos.left;
-        w.style.right = 'auto';
-        w.style.bottom = 'auto';
+        w.style.right = w.style.bottom = 'auto';
     }
 }
 
 function flash() {
     const w = document.getElementById('hs-widget');
     if (!w) return;
-    w.classList.remove('hs-flash');
+    w.classList.remove('flash');
     void w.offsetWidth;
-    w.classList.add('hs-flash');
+    w.classList.add('flash');
 }
 
-function setupDragAndTap(el) {
-    let dragging = false, moved = false, ox = 0, oy = 0;
-    let lastTap = 0;
+// ====================== ПЕРЕТАСКИВАНИЕ + ДВОЙНОЙ ТАП ======================
+function makeInteractive(el) {
+    let drag = false, moved = false, ox = 0, oy = 0, last = 0;
 
     el.addEventListener('pointerdown', e => {
         const r = el.getBoundingClientRect();
         ox = e.clientX - r.left;
         oy = e.clientY - r.top;
-        dragging = true;
-        moved = false;
+        drag = true; moved = false;
         el.setPointerCapture(e.pointerId);
         e.preventDefault();
     });
-
     el.addEventListener('pointermove', e => {
-        if (!dragging) return;
-        if (Math.abs(e.clientX - (el.getBoundingClientRect().left + ox)) > 5 ||
-            Math.abs(e.clientY - (el.getBoundingClientRect().top + oy)) > 5) {
-            moved = true;
-        }
+        if (!drag) return;
+        if (Math.abs(e.movementX) > 3 || Math.abs(e.movementY) > 3) moved = true;
         if (!moved) return;
-        el.style.left = Math.max(4, Math.min(window.innerWidth - 90, e.clientX - ox)) + 'px';
-        el.style.top = Math.max(4, Math.min(window.innerHeight - 110, e.clientY - oy)) + 'px';
-        el.style.right = 'auto';
-        el.style.bottom = 'auto';
+        el.style.left = Math.max(4, Math.min(innerWidth - 90, e.clientX - ox)) + 'px';
+        el.style.top  = Math.max(4, Math.min(innerHeight - 110, e.clientY - oy)) + 'px';
+        el.style.right = el.style.bottom = 'auto';
     });
-
     el.addEventListener('pointerup', () => {
-        if (!dragging) return;
-        dragging = false;
+        if (!drag) return;
+        drag = false;
         if (moved) {
             cfg().widgetPos = { top: el.style.top, left: el.style.left };
             save();
             return;
         }
-        // тап
         const now = Date.now();
-        if (now - lastTap < 320) {
-            // двойной тап
-            lastTap = 0;
+        if (now - last < 300) {
+            last = 0;
             openPanel();
-        } else {
-            lastTap = now;
-        }
+        } else last = now;
     });
 }
 
-// ===================== ПАРСЕР =====================
-const RE_SYNC = /{{HS::SYNC:(\d{1,3})}}/gi;
-const RE_EVENT = /{{HS::EVENT:([^}]+)}}/gi;
-const RE_TYPE = /{{HS::TYPE:([^}]+)}}/gi;
-const RE_NPC = /{{HS::NPC:([^:]+):(\d{1,3})}}/gi;
+// ====================== ПАРСЕР ======================
+const R_SYNC = /{{HS::SYNC:(\d{1,3})}}/gi;
+const R_TYPE = /{{HS::TYPE:([^}]+)}}/gi;
+const R_EVENT = /{{HS::EVENT:([^}]+)}}/gi;
+const R_NPC = /{{HS::NPC:([^:]+):(\d{1,3})}}/gi;
 
 function parse(text) {
     if (!text) return;
     const c = cfg();
-    let ch = false;
+    let changed = false;
 
-    const syncs = [...text.matchAll(RE_SYNC)];
-    if (syncs.length) {
-        const v = Math.max(0, Math.min(100, parseInt(syncs.at(-1)[1], 10)));
-        if (!isNaN(v) && v !== c.score) {
+    const s = [...text.matchAll(R_SYNC)];
+    if (s.length) {
+        const v = Math.max(0, Math.min(100, +s.at(-1)[1]));
+        if (v !== c.score) {
             const old = c.score;
             c.score = v;
-            ch = true;
+            changed = true;
             c.milestones.forEach(m => {
                 if (!m.done && c.score >= m.threshold) {
                     m.done = true;
                     flash();
-                    try { toastr.success('Достижение: ' + m.name, 'Heartbeat Sync'); } catch {}
+                    try { toastr.success('Достижение: ' + m.name); } catch {}
                 }
             });
             if (Math.abs(v - old) >= 12) flash();
         }
     }
+    const t = [...text.matchAll(R_TYPE)];
+    if (t.length) { c.relationType = t.at(-1)[1].trim().toLowerCase(); changed = true; }
 
-    const types = [...text.matchAll(RE_TYPE)];
-    if (types.length) {
-        c.relationType = types.at(-1)[1].trim().toLowerCase();
-        ch = true;
-    }
-
-    const evs = [...text.matchAll(RE_EVENT)];
-    if (evs.length) {
+    const e = [...text.matchAll(R_EVENT)];
+    if (e.length) {
         flash();
-        try { toastr.info('Событие: ' + evs.at(-1)[1].trim(), 'Heartbeat Sync'); } catch {}
-        ch = true;
+        try { toastr.info('Событие: ' + e.at(-1)[1].trim()); } catch {}
+        changed = true;
     }
 
-    [...text.matchAll(RE_NPC)].forEach(m => {
-        const name = m[1].trim();
-        const sc = Math.max(0, Math.min(100, parseInt(m[2], 10)));
+    [...text.matchAll(R_NPC)].forEach(m => {
+        const name = m[1].trim(), sc = +m[2];
         let n = c.npcs.find(x => x.name.toLowerCase() === name.toLowerCase());
         if (!n) c.npcs.push({ name, score: sc });
         else n.score = sc;
-        ch = true;
+        changed = true;
     });
 
-    if (ch) {
+    if (changed) {
         save();
-        updateWidget();
-        if (document.getElementById('hs-panel-overlay')?.classList.contains('open')) renderPanel();
+        updateHeart();
+        if (document.getElementById('hs-overlay')?.classList.contains('show')) drawPanel();
     }
 }
 
-function startObserver() {
+function watchChat() {
     const chat = document.getElementById('chat');
     if (!chat) return;
-    new MutationObserver(muts => {
-        for (const m of muts) {
+    new MutationObserver(ms => {
+        for (const m of ms)
             for (const n of m.addedNodes) {
                 if (n.nodeType !== 1) continue;
                 const t = n.querySelector?.('.mes_text')?.textContent || n.textContent;
                 if (t) parse(t);
             }
-        }
     }).observe(chat, { childList: true, subtree: true });
 }
 
-// ===================== ПАНЕЛЬ =====================
+// ====================== ПАНЕЛЬ ======================
 function openPanel() {
-    let ov = document.getElementById('hs-panel-overlay');
+    let ov = document.getElementById('hs-overlay');
     if (!ov) {
         ov = document.createElement('div');
-        ov.id = 'hs-panel-overlay';
+        ov.id = 'hs-overlay';
         ov.innerHTML = '<div id="hs-panel"></div>';
         document.body.appendChild(ov);
-        ov.addEventListener('click', e => {
-            if (e.target === ov) closePanel();
-        });
+        ov.onclick = e => { if (e.target === ov) closePanel(); };
     }
-    ov.classList.add('open');
-    renderPanel();
+    ov.classList.add('show');
+    drawPanel();
 }
-
 function closePanel() {
-    document.getElementById('hs-panel-overlay')?.classList.remove('open');
+    document.getElementById('hs-overlay')?.classList.remove('show');
 }
-
-function renderPanel() {
+function drawPanel() {
     const c = cfg();
-    const box = document.getElementById('hs-panel');
-    if (!box) return;
-    const st = state(c.score);
-
-    box.innerHTML = `
-        <div class="hs-head">
+    const p = document.getElementById('hs-panel');
+    if (!p) return;
+    p.innerHTML = `
+        <div class="hs-title">
             <span>Heartbeat Sync</span>
-            <button class="hs-x" id="hs-x">×</button>
+            <button class="hs-x" id="hs-close">×</button>
         </div>
-        <div class="hs-big">${c.score}%</div>
-        <div class="hs-sub">${c.relationType} · ${st.name}</div>
-
+        <div class="hs-score">${c.score}%</div>
+        <div class="hs-sub">${c.relationType}</div>
         <div class="hs-sec">Достижения</div>
         ${c.milestones.map(m => `
-            <div class="hs-row ${m.done ? 'done' : ''}">
-                <span>${m.name}</span>
-                <span>${m.threshold}%</span>
-            </div>
-        `).join('')}
-
-        ${c.npcs.length ? `
-            <div class="hs-sec">Другие связи</div>
-            ${c.npcs.map(n => `
-                <div class="hs-row">
-                    <span>${n.name}</span>
-                    <span>${n.score}%</span>
-                </div>
-            `).join('')}
-        ` : ''}
-
+            <div class="hs-line ${m.done ? 'done' : ''}">
+                <span>\( {m.name}</span><span> \){m.threshold}%</span>
+            </div>`).join('')}
+        ${c.npcs.length ? `<div class="hs-sec">Другие связи</div>
+            \( {c.npcs.map(n => `<div class="hs-line"><span> \){n.name}</span><span>${n.score}%</span></div>`).join('')}` : ''}
         <button class="hs-btn ${c.sensorsActive ? 'on' : ''}" id="hs-act">
             ${c.sensorsActive ? 'Sensors Active' : 'Activate Sensors'}
-        </button>
-    `;
-
-    document.getElementById('hs-x').onclick = closePanel;
+        </button>`;
+    document.getElementById('hs-close').onclick = closePanel;
     document.getElementById('hs-act').onclick = () => {
         c.sensorsActive = true;
         save();
-        startObserver();
-        try { toastr.success('Сенсоры включены. Инструкция идёт в промпт автоматически.', 'Heartbeat Sync'); } catch {}
-        renderPanel();
+        watchChat();
+        try { toastr.success('Сенсоры включены'); } catch {}
+        drawPanel();
     };
 }
 
-// ===================== WAND =====================
+// ====================== ИНЪЕКЦИЯ ======================
+const INSTR = `You are under Heartbeat Sync protocol.
+At the VERY END of every reply add:
+{{HS::SYNC:XX}}
+Optional: {{HS::TYPE:romance}} {{HS::EVENT:name}} {{HS::NPC:Name:45}}
+Only at the end. No explanations.`;
+
+function inject(data) {
+    if (!cfg().sensorsActive) return;
+    try {
+        if (data?.chat && Array.isArray(data.chat)) {
+            data.chat = data.chat.filter(m => !m._hs);
+            data.chat.push({ role: 'system', content: INSTR, _hs: true });
+        }
+        if (data?.prompt && typeof data.prompt === 'string' && !data.prompt.includes('Heartbeat Sync protocol')) {
+            data.prompt += '\n\n' + INSTR;
+        }
+    } catch {}
+}
+
+// ====================== WAND ======================
 function addWand() {
     if (document.getElementById('hs-wand')) return true;
     const menu = document.getElementById('extensionsMenu');
     if (!menu) return false;
-    const item = document.createElement('div');
-    item.id = 'hs-wand';
-    item.className = 'list-group-item flex-container flexGap5 interactable';
-    item.innerHTML = '<i class="fa-solid fa-heart-pulse" style="color:#ff4d6d"></i><span>Heartbeat Sync</span>';
-    item.onclick = openPanel;
-    menu.appendChild(item);
+    const i = document.createElement('div');
+    i.id = 'hs-wand';
+    i.className = 'list-group-item flex-container flexGap5 interactable';
+    i.innerHTML = '<i class="fa-solid fa-heart-pulse" style="color:#ff4d6d"></i><span>Heartbeat Sync</span>';
+    i.onclick = openPanel;
+    menu.appendChild(i);
     return true;
 }
 
-// ===================== INIT =====================
+// ====================== START ======================
 jQuery(() => {
     try {
         injectStyles();
-        updateWidget();
+        updateHeart();
 
         if (!addWand()) {
-            let t = 0;
-            const iv = setInterval(() => { if (addWand() || ++t > 25) clearInterval(iv); }, 300);
+            let n = 0;
+            const t = setInterval(() => { if (addWand() || ++n > 30) clearInterval(t); }, 250);
         }
 
         if (event_types?.CHAT_COMPLETION_PROMPT_READY)
-            eventSource.on(event_types.CHAT_COMPLETION_PROMPT_READY, injectPrompt);
+            eventSource.on(event_types.CHAT_COMPLETION_PROMPT_READY, inject);
         if (event_types?.GENERATE_AFTER_COMBINING_PROMPTS)
-            eventSource.on(event_types.GENERATE_AFTER_COMBINING_PROMPTS, injectPrompt);
+            eventSource.on(event_types.GENERATE_AFTER_COMBINING_PROMPTS, inject);
 
-        if (event_types?.MESSAGE_RECEIVED) {
+        if (event_types?.MESSAGE_RECEIVED)
             eventSource.on(event_types.MESSAGE_RECEIVED, () => {
                 setTimeout(() => {
                     const last = document.querySelector('#chat .mes:last-child .mes_text');
                     if (last) parse(last.textContent);
-                }, 300);
+                }, 280);
             });
-        }
 
-        if (cfg().sensorsActive) startObserver();
-
-        console.log('[Heartbeat Sync] fixed version loaded');
+        if (cfg().sensorsActive) watchChat();
+        console.log('[Heartbeat Sync] ready');
     } catch (e) {
-        console.error('[HS]', e);
+        console.error(e);
     }
 });
