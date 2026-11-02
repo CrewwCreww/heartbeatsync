@@ -8,7 +8,6 @@
     let currentSync = 0;
     let syncTrend = 'stable';
 
-    // Безопасное получение данных персонажа
     function getCharData() {
         const ctx = SillyTavern.getContext();
         const char = ctx?.characters?.[ctx.characterId];
@@ -18,7 +17,6 @@
         };
     }
 
-    // Обновление визуала сердца (Bio-Glass стиль)
     function updateHeartVisual(score, trend) {
         const heartIcon = document.getElementById('hs-heart-icon');
         const ecgLine = document.getElementById('hs-ecg-line');
@@ -58,7 +56,7 @@
         }
     }
 
-    // РЕАЛЬНАЯ генерация правил через API
+    // МЕТОД KISKA SORA: Использование внутреннего генератора ST
     async function generateSyncRules() {
         const char = getCharData();
         const btn = document.getElementById('hs-init-btn');
@@ -68,7 +66,6 @@
             return;
         }
 
-        // Блокируем кнопку во время запроса
         if (btn) {
             btn.disabled = true;
             btn.innerText = '⏳ Синхронизация...';
@@ -91,31 +88,35 @@
 }`;
 
         try {
-            // Прямой запрос к подключенной нейросети через ST API
-            const response = await fetch('/api/chat/completions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    messages: [{ role: 'system', content: systemPrompt }],
-                    temperature: 0.7 
-                })
+            // Используем внутренний метод SillyTavern для генерации
+            // Это работает с любым подключенным API (OpenAI, Kobold, Ollama и т.д.)
+            const response = await SillyTavern.generateRaw({
+                prompt: systemPrompt,
+                temperature: 0.7,
+                max_tokens: 500
             });
-            
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const data = await response.json();
-            
+
+            if (!response) throw new Error('Пустой ответ от AI');
+
             // Чистим ответ от markdown-блоков
-            let cleanJson = data.choices[0].message.content.replace(/```json|```/g, '').trim();
+            let cleanJson = response.replace(/```json|```/g, '').trim();
             const rules = JSON.parse(cleanJson);
             
             localStorage.setItem('hs_rules_' + char.name, JSON.stringify(rules));
-            updateHeartVisual(50, 'stable'); // Старт с 50% после успешной настройки
+            updateHeartVisual(50, 'stable');
             showToast(`✅ Сенсоры активны для ${char.name}`, 'success');
         } catch (e) {
             console.error(e);
-            showToast(`❌ Ошибка связи: ${e.message}`, 'error');
+            // Если generateRaw не доступен (старая версия ST), fallback на вставку в чат
+            const sendTextArea = document.getElementById('send_textarea');
+            if (sendTextArea) {
+                sendTextArea.value = `[System Note: Heartbeat Sync Active] Ты теперь отслеживаешь уровень синхронизации. После каждого ответа добавляй тег {{HS::SYNC:X}} (0-100) в конец сообщения.`;
+                sendTextArea.dispatchEvent(new Event('input', { bubbles: true }));
+                showToast('📝 Fallback: Промпт вставлен в чат. Нажми Send.', 'info');
+            } else {
+                showToast(`❌ Ошибка: ${e.message}`, 'error');
+            }
         } finally {
-            // Разблокируем кнопку
             if (btn) {
                 btn.disabled = false;
                 btn.innerText = 'Activate Sensors';
@@ -123,7 +124,6 @@
         }
     }
 
-    // Парсер тегов в сообщениях чата
     function parseMessageForTags(text) {
         const syncMatch = text.match(/{{HS::SYNC:(\d+)}}/);
         if (syncMatch) {
@@ -136,9 +136,7 @@
         }
     }
 
-    // Инициализация интерфейса
     function init() {
-        // Плавающий виджет в чате
         const widget = document.createElement('div');
         widget.id = 'hs-widget';
         widget.innerHTML = `
@@ -158,7 +156,6 @@
         `;
         document.body.appendChild(widget);
 
-        // Панель настроек в Extensions
         const settingsPanel = document.createElement('div');
         settingsPanel.id = 'hs-settings-panel';
         settingsPanel.innerHTML = `
@@ -172,7 +169,6 @@
 
         document.getElementById('hs-init-btn').onclick = generateSyncRules;
 
-        // Слежение за новыми сообщениями в чате
         const chatObserver = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 mutation.addedNodes.forEach((node) => {
