@@ -1,2 +1,12 @@
-# heartbeatsync
-Heartbeat Sync - Relationship tracker for SillyTavern
+# ❤️ Heartbeat Sync
+
+Простое расширение для **SillyTavern** с плавающим виджетом-сердцем, анимацией ЭКГ и синхронизацией «пульса» через теги AI.
+
+Виджет появляется сразу после загрузки, можно перетаскивать, работает на ПК и на Android/Termux.
+
+---
+
+## 📦 Установка
+
+1. Открой SillyTavern → **Extensions** → **Install extension**
+2. Вставь ссылку:
