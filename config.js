@@ -1,0 +1,32 @@
+import { extension_settings } from '../../../extensions.js';
+import { saveSettingsDebounced } from '../../../../script.js';
+
+export const EXT_NAME = 'heartbeat-sync';
+
+export const defaultSettings = {
+    isEnabled: true,
+    score: 45,
+    sensorsActive: false,
+    widgetPos: null,
+    milestones: [
+        { name: 'Доверие', threshold: 35, done: false },
+        { name: 'Признание', threshold: 60, done: false },
+        { name: 'Поцелуй', threshold: 75, done: false },
+        { name: 'Полная синхронизация', threshold: 95, done: false },
+    ],
+};
+
+export function cfg() {
+    if (!extension_settings[EXT_NAME]) {
+        extension_settings[EXT_NAME] = structuredClone(defaultSettings);
+    }
+    const c = extension_settings[EXT_NAME];
+    for (const [k, v] of Object.entries(defaultSettings)) {
+        if (c[k] === undefined) c[k] = structuredClone(v);
+    }
+    return c;
+}
+
+export function save() {
+    saveSettingsDebounced();
+}
