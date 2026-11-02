@@ -78,32 +78,6 @@ function injectStyles() {
     60% { transform: scale(1); }
 }
 
-#hs-overlay {
-    position: fixed !important;
-    inset: 0 !important;
-    background: rgba(0,0,0,0.7) !important;
-    z-index: 1000000 !important;
-    display: none !important;
-    align-items: flex-end !important;
-    justify-content: center !important;
-}
-#hs-overlay.show { display: flex !important; }
-
-#hs-panel {
-    width: 100% !important;
-    max-width: 420px !important;
-    max-height: 80vh !important;
-    background: #0D0D0D !important;
-    border-radius: 18px 18px 0 0 !important;
-    border: 1px solid #2a2a2a !important;
-    border-bottom: none !important;
-    color: #F5ECD7 !important;
-    font-family: system-ui, -apple-system, sans-serif !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-}
-
 .hs-header {
     display: flex;
     align-items: center;
@@ -305,7 +279,8 @@ function createWidget() {
     let drag = false;
     let moved = false;
     let grabX = 0, grabY = 0;
-    let lastTap = 0;
+    let longPressTimer = null;
+    let openedByLongPress = false;
 
     w.addEventListener('pointerdown', (e) => {
         const r = w.getBoundingClientRect();
@@ -313,7 +288,15 @@ function createWidget() {
         grabY = e.clientY - r.top;
         drag = true;
         moved = false;
-        w.setPointerCapture(e.pointerId);
+        openedByLongPress = false;
+
+        longPressTimer = setTimeout(() => {
+            if (!moved) {
+                openedByLongPress = true;
+                openPanel();
+            }
+        }, 500);
+
         e.preventDefault();
     });
 
@@ -323,7 +306,14 @@ function createWidget() {
         const dx = Math.abs(e.clientX - (w.getBoundingClientRect().left + grabX));
         const dy = Math.abs(e.clientY - (w.getBoundingClientRect().top + grabY));
 
-        if (!moved && (dx > 4 || dy > 4)) moved = true;
+        if (!moved && (dx > 6 || dy > 6)) {
+            moved = true;
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        }
+
         if (!moved) return;
 
         let left = e.clientX - grabX;
@@ -342,25 +332,28 @@ function createWidget() {
         if (!drag) return;
         drag = false;
 
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+
+        if (openedByLongPress) return;
+
         if (moved) {
             cfg().widgetPos = { top: w.style.top, left: w.style.left };
             save();
             return;
         }
 
-        // Точно как в Love Score
-        const now = Date.now();
-        if (now - lastTap < 320) {
-            lastTap = 0;
-            openPanel();
-        } else {
-            lastTap = now;
-            flashWidget();
-        }
+        flashWidget();
     });
 
     w.addEventListener('pointercancel', () => {
         drag = false;
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
     });
 
     const pos = cfg().widgetPos;
@@ -392,22 +385,76 @@ function flashWidget() {
 let currentTab = 'overview';
 
 function openPanel() {
+    console.log('[HS] openPanel START');
+
     let ov = document.getElementById('hs-overlay');
+
     if (!ov) {
         ov = document.createElement('div');
         ov.id = 'hs-overlay';
         ov.innerHTML = '<div id="hs-panel"></div>';
         document.body.appendChild(ov);
+
         ov.addEventListener('click', (e) => {
             if (e.target === ov) closePanel();
         });
     }
-    renderPanel();
-    ov.classList.add('show');
+
+    // Жёсткие inline-стили — не зависят от CSS-классов
+    ov.style.cssText = `
+        position: fixed !important;
+        inset: 0 !important;
+        background: rgba(0,0,0,0.75) !important;
+        z-index: 2147483647 !important;
+        display: flex !important;
+        align-items: flex-end !important;
+        justify-content: center !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    `;
+
+    const panel = document.getElementById('hs-panel');
+    if (panel) {
+        panel.style.cssText = `
+            width: 100% !important;
+            max-width: 420px !important;
+            max-height: 80vh !important;
+            background: #0D0D0D !important;
+            border-radius: 18px 18px 0 0 !important;
+            border: 1px solid #2a2a2a !important;
+            border-bottom: none !important;
+            color: #F5ECD7 !important;
+            font-family: system-ui, -apple-system, sans-serif !important;
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+        `;
+    }
+
+    try {
+        renderPanel();
+        console.log('[HS] panel rendered OK');
+    } catch (err) {
+        console.error('[HS] renderPanel FAILED:', err);
+        if (panel) {
+            panel.innerHTML = `
+                <div style="padding:20px;color:#fff;">
+                    <div style="font-size:16px;margin-bottom:10px;font-weight:700;">Heartbeat Sync</div>
+                    <div style="opacity:0.6;font-size:13px;margin-bottom:16px;">Ошибка отрисовки. Смотри консоль.</div>
+                    <button id="hs-close" style="padding:10px 16px;background:#C9A84C;border:none;border-radius:8px;color:#000;font-weight:700;cursor:pointer;">Закрыть</button>
+                </div>
+            `;
+            document.getElementById('hs-close').onclick = closePanel;
+        }
+    }
 }
 
 function closePanel() {
-    document.getElementById('hs-overlay')?.classList.remove('show');
+    const ov = document.getElementById('hs-overlay');
+    if (ov) {
+        ov.style.display = 'none';
+        console.log('[HS] panel closed');
+    }
 }
 
 function renderPanel() {
@@ -579,7 +626,7 @@ function parseMessage(text) {
     if (changed) {
         save();
         updateWidget();
-        if (document.getElementById('hs-overlay')?.classList.contains('show')) {
+        if (document.getElementById('hs-overlay')?.style.display === 'flex') {
             renderPanel();
         }
     }
@@ -594,11 +641,15 @@ function addWand() {
     item.id = 'hs-wand';
     item.className = 'list-group-item flex-container flexGap5 interactable';
     item.innerHTML = '<i class="fa-solid fa-star" style="color:#C9A84C"></i><span>Heartbeat Sync</span>';
+
     item.onclick = (e) => {
         e.stopPropagation();
+        console.log('[HS] wand clicked');
         openPanel();
     };
+
     menu.appendChild(item);
+    console.log('[HS] wand added');
     return true;
 }
 
@@ -624,8 +675,8 @@ jQuery(() => {
             });
         }
 
-        console.log('[HS] v5.2 — full rewrite with Love Score double-tap');
+        console.log('[HS] v5.4 — hard openPanel');
     } catch (e) {
-        console.error('[HS]', e);
+        console.error('[HS] init error:', e);
     }
 });
