@@ -1,249 +1,257 @@
-import { eventSource, event_types } from '../../../../script.js';
+import { eventSource, event_types, saveSettingsDebounced } from '../../../../script.js';
 import { extension_settings } from '../../../extensions.js';
 
 const EXT_NAME = 'heartbeat-sync';
 
 const defaultSettings = {
     isEnabled: true,
-    score: 50,
-    widgetSize: 70,
+    score: 42,
+    relationType: 'neutral',
+    milestones: [
+        { id: 'first_contact', name: 'Первый контакт', threshold: 15, done: false },
+        { id: 'trust', name: 'Доверие', threshold: 35, done: false },
+        { id: 'confession', name: 'Признание', threshold: 60, done: false },
+        { id: 'kiss', name: 'Поцелуй', threshold: 75, done: false },
+        { id: 'sync', name: 'Полная синхронизация', threshold: 95, done: false },
+    ],
+    npcs: [],          // { name, score, type }
+    widgetPos: null,
+    sensorsActive: false,
 };
 
 function cfg() {
     if (!extension_settings[EXT_NAME]) {
         extension_settings[EXT_NAME] = structuredClone(defaultSettings);
     }
-    return extension_settings[EXT_NAME];
+    // миграция
+    const c = extension_settings[EXT_NAME];
+    for (const [k, v] of Object.entries(defaultSettings)) {
+        if (c[k] === undefined) c[k] = structuredClone(v);
+    }
+    return c;
+}
+
+function save() {
+    saveSettingsDebounced();
 }
 
 // ===================== СТИЛИ =====================
 function injectStyles() {
     if (document.getElementById('hs-styles')) return;
-
     const el = document.createElement('style');
     el.id = 'hs-styles';
     el.textContent = `
 #hs-widget {
     position: fixed;
-    bottom: 110px;
-    right: 18px;
-    width: 78px;
+    bottom: 100px;
+    right: 16px;
+    width: 92px;
+    height: 108px;
     z-index: 999999;
     cursor: grab;
     user-select: none;
     touch-action: none;
-    filter: drop-shadow(0 4px 14px rgba(255, 60, 90, 0.35));
-    transition: filter 0.25s ease, transform 0.3s ease;
-    pointer-events: auto;
+    filter: drop-shadow(0 6px 18px rgba(180, 20, 40, 0.35));
+    transition: filter 0.3s ease, transform 0.35s ease;
 }
 #hs-widget:active { cursor: grabbing; }
-
-.hs-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    padding: 10px 8px 8px;
-    background: rgba(18, 14, 22, 0.72);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+#hs-widget.hs-flash {
+    animation: hs-flash 0.7s ease;
+}
+@keyframes hs-flash {
+    0% { filter: drop-shadow(0 0 4px #ff2a4a) brightness(1); transform: scale(1); }
+    35% { filter: drop-shadow(0 0 28px #ff4d6d) brightness(1.6); transform: scale(1.18); }
+    100% { filter: drop-shadow(0 6px 18px rgba(180, 20, 40, 0.35)) brightness(1); transform: scale(1); }
 }
 
-.hs-ecg {
-    width: 64px;
-    height: 18px;
-    overflow: hidden;
-    opacity: 0.9;
+.hs-heart-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
 }
-.hs-ecg svg { width: 100%; height: 100%; }
+.hs-heart-body {
+    transition: fill 0.5s ease, opacity 0.4s ease;
+}
+.hs-vessels {
+    transition: stroke 0.5s ease, opacity 0.4s ease;
+}
+.hs-glow {
+    transition: opacity 0.5s ease;
+}
+
+.hs-score-text {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-weight: 700;
+    fill: #fff;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.7);
+    pointer-events: none;
+}
 .hs-ecg-line {
     fill: none;
-    stroke: hsl(var(--hs-hue, 0), 85%, 62%);
-    stroke-width: 1.8;
     stroke-linecap: round;
-    stroke-dasharray: 5 3;
-    animation: hs-ecg 1.3s linear infinite;
-    filter: drop-shadow(0 0 3px hsla(var(--hs-hue, 0), 100%, 60%, 0.6));
+    stroke-dasharray: 4 3;
+    animation: hs-ecg 1.4s linear infinite;
 }
 @keyframes hs-ecg {
-    to { stroke-dashoffset: -32; }
+    to { stroke-dashoffset: -28; }
 }
 
-.hs-heart {
-    width: 44px;
-    height: 40px;
-    fill: hsl(var(--hs-hue, 0), 82%, 58%);
-    animation: hs-beat var(--hs-speed, 0.9s) ease-in-out infinite;
-    transition: fill 0.4s ease;
-    filter: drop-shadow(0 0 6px hsla(var(--hs-hue, 0), 100%, 60%, 0.55));
+.hs-pulse {
+    animation: hs-beat var(--hs-speed, 1.1s) ease-in-out infinite;
+    transform-origin: center;
 }
 @keyframes hs-beat {
     0%, 100% { transform: scale(1); }
-    14% { transform: scale(1.16); }
-    28% { transform: scale(1); }
-    42% { transform: scale(1.1); }
-    56% { transform: scale(1); }
+    12% { transform: scale(1.07); }
+    24% { transform: scale(1); }
+    36% { transform: scale(1.04); }
+    48% { transform: scale(1); }
 }
 
-#hs-percent {
-    font-size: 13px;
+/* панель */
+#hs-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(380px, 94vw);
+    max-height: 80vh;
+    overflow-y: auto;
+    background: rgba(16, 12, 18, 0.92);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 60, 90, 0.25);
+    border-radius: 14px;
+    z-index: 1000000;
+    padding: 16px;
+    color: #e8e0e4;
+    font-family: system-ui, sans-serif;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.55);
+    display: none;
+}
+#hs-panel.open { display: block; }
+.hs-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
     font-weight: 700;
-    color: #fff;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
-    letter-spacing: 0.3px;
+    font-size: 16px;
+    color: #ff6b8a;
 }
-
-.hs-btn {
-    margin-top: 3px;
-    padding: 4px 9px;
-    font-size: 11px;
-    font-weight: 600;
+.hs-close {
+    background: none;
     border: none;
-    border-radius: 20px;
-    background: linear-gradient(135deg, #ff4d6d, #c9184a);
-    color: white;
+    color: #aaa;
+    font-size: 20px;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(201, 24, 74, 0.4);
-    white-space: nowrap;
+}
+.hs-section {
+    margin-bottom: 14px;
+}
+.hs-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    opacity: 0.5;
+    margin-bottom: 6px;
+}
+.hs-btn {
+    background: linear-gradient(135deg, #ff4d6d, #c9184a);
+    border: none;
+    color: white;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 6px;
 }
 .hs-btn.active {
     background: linear-gradient(135deg, #2a9d8f, #1d6f66);
 }
-
-@media (max-width: 600px) {
-    #hs-widget {
-        bottom: 95px;
-        right: 12px;
-        transform: scale(0.92);
-        transform-origin: bottom right;
-    }
+.hs-milestone {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.hs-milestone.done { opacity: 0.45; text-decoration: line-through; }
+.hs-npc-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 4px 0;
+}
+.hs-type {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 2px;
 }
 `;
     document.head.appendChild(el);
 }
 
-// ===================== ВИДЖЕТ =====================
-function updateVisual(score) {
-    const clamped = Math.max(0, Math.min(100, Math.round(score)));
-    let hue = 200;
-    if (clamped >= 60) hue = 340;
-    else if (clamped >= 30) hue = 0;
-
-    document.documentElement.style.setProperty('--hs-hue', hue);
-    document.documentElement.style.setProperty('--hs-speed', `${Math.max(0.5, 1.25 - clamped / 110)}s`);
-
-    const percentEl = document.getElementById('hs-percent');
-    if (percentEl) percentEl.textContent = clamped + '%';
+// ===================== ЦВЕТА ПО SCORE =====================
+function getVisualState(score) {
+    const s = Math.max(0, Math.min(100, score));
+    if (s <= 20) return { hue: 210, sat: 25, light: 35, speed: 1.6, glow: 0.15, label: 'холод' };
+    if (s <= 50) return { hue: 0, sat: 55, light: 38, speed: 1.15, glow: 0.35, label: 'тёплый' };
+    if (s <= 80) return { hue: 350, sat: 80, light: 48, speed: 0.85, glow: 0.65, label: 'горячий' };
+    return { hue: 0, sat: 95, light: 52, speed: 0.55, glow: 0.95, label: 'огонь' };
 }
 
-function createWidget() {
-    if (document.getElementById('hs-widget')) return;
+// ===================== SVG СЕРДЦА =====================
+function buildHeartSVG(score) {
+    const st = getVisualState(score);
+    const fill = `hsl(${st.hue}, ${st.sat}%, ${st.light}%)`;
+    const vessel = `hsl(${st.hue}, ${Math.min(100, st.sat + 15)}%, ${Math.min(70, st.light + 18)}%)`;
+    const glowOp = st.glow;
 
-    const w = document.createElement('div');
-    w.id = 'hs-widget';
-    w.innerHTML = `
-        <div class="hs-container">
-            <div class="hs-ecg">
-                <svg viewBox="0 0 100 30" preserveAspectRatio="none">
-                    <polyline class="hs-ecg-line" points="0,15 12,15 18,4 24,26 30,15 48,15 54,7 60,23 66,15 82,15 88,3 94,27 100,15"/>
-                </svg>
-            </div>
-            <svg class="hs-heart" viewBox="0 0 32 29">
-                <path d="M16 28 C16 28 2 18 2 10 C2 5 6 1 11 1 C13.5 1 15.5 2.5 16 4.5 C16.5 2.5 18.5 1 21 1 C26 1 30 5 30 10 C30 18 16 28 16 28 Z"/>
-            </svg>
-            <span id="hs-percent">50%</span>
-            <button id="hs-activate" class="hs-btn">Activate</button>
-        </div>
-    `;
-    document.body.appendChild(w);
+    return `
+<svg class="hs-heart-svg hs-pulse" style="--hs-speed:${st.speed}s" viewBox="0 0 100 115" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="hs-inner-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="hs-glass" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/>
+      <stop offset="50%" stop-color="rgba(255,255,255,0.04)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.15)"/>
+    </linearGradient>
+    <clipPath id="hs-clip">
+      <path d="M50 98 C50 98 12 70 12 42 C12 24 26 12 42 12 C48 12 50 16 50 16 C50 16 52 12 58 12 C74 12 88 24 88 42 C88 70 50 98 50 98 Z"/>
+    </clipPath>
+  </defs>
 
-    document.getElementById('hs-activate').addEventListener('click', () => {
-        const btn = document.getElementById('hs-activate');
-        btn.textContent = 'Active';
-        btn.classList.add('active');
-        try { toastr?.success?.('Heartbeat Sync активирован. Теги {{HS::SYNC:XX}} будут ловиться.'); } catch {}
-        startObserver();
-    });
+  <!-- внешнее стекло -->
+  <path class="hs-heart-body" d="M50 98 C50 98 12 70 12 42 C12 24 26 12 42 12 C48 12 50 16 50 16 C50 16 52 12 58 12 C74 12 88 24 88 42 C88 70 50 98 50 98 Z"
+        fill="rgba(18,10,14,0.75)" stroke="rgba(255,80,110,0.35)" stroke-width="1.8"/>
 
-    makeDraggable(w);
-    updateVisual(cfg().score || 50);
-}
+  <!-- заливка по score -->
+  <rect x="0" y="\( {98 - (score / 100) * 86}" width="100" height=" \){(score / 100) * 86}"
+        clip-path="url(#hs-clip)" fill="${fill}" opacity="0.82" filter="url(#hs-inner-glow)"/>
 
-function makeDraggable(el) {
-    let drag = false, ox = 0, oy = 0;
-    el.addEventListener('pointerdown', e => {
-        if (e.target.closest('button')) return;
-        const r = el.getBoundingClientRect();
-        ox = e.clientX - r.left;
-        oy = e.clientY - r.top;
-        drag = true;
-        el.setPointerCapture(e.pointerId);
-        e.preventDefault();
-    });
-    el.addEventListener('pointermove', e => {
-        if (!drag) return;
-        el.style.left = Math.max(8, e.clientX - ox) + 'px';
-        el.style.top  = Math.max(8, e.clientY - oy) + 'px';
-        el.style.right = 'auto';
-        el.style.bottom = 'auto';
-    });
-    el.addEventListener('pointerup', () => { drag = false; });
-}
+  <!-- сосуды -->
+  <g class="hs-vessels" fill="none" stroke="${vessel}" stroke-width="1.1" opacity="0.85">
+    <path d="M38 38 Q45 48 42 62"/>
+    <path d="M62 36 Q55 50 58 64"/>
+    <path d="M50 28 Q48 45 50 70"/>
+    <path d="M32 52 Q40 58 48 55"/>
+    <path d="M68 50 Q60 58 52 56"/>
+    <path d="M44 72 Q50 78 56 72"/>
+  </g>
 
-// ===================== ПАРСЕР =====================
-const TAG_SYNC = /{{HS::SYNC:(\d{1,3})}}/gi;
+  <!-- блик стекла -->
+  <path d="M50 98 C50 98 12 70 12 42 C12 24 26 12 42 12 C48 12 50 16 50 16 C50 16 52 12 58 12 C74 12 88 24 88 42 C88 70 50 98 50 98 Z"
+        fill="url(#hs-glass)" opacity="0.55"/>
 
-function parseText(text) {
-    if (!text) return;
-    const matches = [...text.matchAll(TAG_SYNC)];
-    if (matches.length === 0) return;
+  <!-- ЭКГ внутри -->
+  <polyline class="hs-ecg-line" points="22,78 30,78 34,68 38,88 42,78 55,78 59,70 63,86 67,78 78,78"
+            stroke="${vessel}" stroke-width="1.3" opacity="0.9"/>
 
-    const last = matches[matches.length - 1];
-    const score = parseInt(last[1], 10);
-    if (isNaN(score)) return;
-
-    cfg().score = Math.max(0, Math.min(100, score));
-    updateVisual(cfg().score);
-}
-
-function startObserver() {
-    const chat = document.getElementById('chat');
-    if (!chat) return;
-
-    const observer = new MutationObserver(mutations => {
-        for (const m of mutations) {
-            for (const node of m.addedNodes) {
-                if (node.nodeType !== 1) continue;
-                const textEl = node.querySelector?.('.mes_text') || node;
-                if (textEl?.textContent) parseText(textEl.textContent);
-            }
-        }
-    });
-
-    observer.observe(chat, { childList: true, subtree: true });
-}
-
-// ===================== ИНИЦИАЛИЗАЦИЯ =====================
-jQuery(() => {
-    try {
-        injectStyles();
-        createWidget();
-
-        if (event_types?.MESSAGE_RECEIVED) {
-            eventSource.on(event_types.MESSAGE_RECEIVED, () => {
-                setTimeout(() => {
-                    const last = document.querySelector('#chat .mes:last-child .mes_text');
-                    if (last) parseText(last.textContent);
-                }, 300);
-            });
-        }
-
-        console.log('[Heartbeat Sync] loaded');
-    } catch (e) {
-        console.error('[Heartbeat Sync] init error', e);
-        try { toastr?.error?.('Heartbeat Sync: ошибка инициализации — ' + e.message); } catch {}
-    }
-});
+  <!-- процент внутри -->
