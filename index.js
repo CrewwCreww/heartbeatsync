@@ -43,7 +43,6 @@ function injectStyles() {
     const s = document.createElement('style');
     s.id = 'hs-css';
     s.textContent = `
-/* ===== ВИДЖЕТ ===== */
 #hs-widget {
     position: fixed !important;
     top: 120px !important;
@@ -58,38 +57,42 @@ function injectStyles() {
 }
 #hs-widget:active { cursor: grabbing !important; }
 #hs-widget.hs-flash { animation: hsFlash 0.5s ease; }
+
 @keyframes hsFlash {
     0% { filter: brightness(1); transform: scale(1); }
     40% { filter: brightness(1.35) drop-shadow(0 0 16px var(--hs-accent)); transform: scale(1.08); }
     100% { filter: brightness(1); transform: scale(1); }
 }
-.hs-spin {
-    animation: hsSpin 16s linear infinite;
+
+.hs-pulse {
+    animation: hsPulse var(--spd, 1.1s) ease-in-out infinite;
     transform-origin: center center;
 }
-.hs-no-anim .hs-spin { animation: none !important; }
-@keyframes hsSpin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+.hs-no-anim .hs-pulse { animation: none !important; }
+
+@keyframes hsPulse {
+    0%, 100% { transform: scale(1); }
+    15% { transform: scale(1.06); }
+    30% { transform: scale(1); }
+    45% { transform: scale(1.03); }
+    60% { transform: scale(1); }
 }
 
-/* ===== ОВЕРЛЕЙ И ПАНЕЛЬ ===== */
 #hs-overlay {
     position: fixed !important;
     inset: 0 !important;
-    background: rgba(0,0,0,0.72) !important;
+    background: rgba(0,0,0,0.7) !important;
     z-index: 1000000 !important;
     display: none !important;
     align-items: flex-end !important;
     justify-content: center !important;
-    padding: 0 !important;
 }
 #hs-overlay.show { display: flex !important; }
 
 #hs-panel {
     width: 100% !important;
     max-width: 420px !important;
-    max-height: 82vh !important;
+    max-height: 80vh !important;
     background: #0D0D0D !important;
     border-radius: 18px 18px 0 0 !important;
     border: 1px solid #2a2a2a !important;
@@ -99,15 +102,13 @@ function injectStyles() {
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
-    box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
 }
 
-/* Шапка */
 .hs-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 16px 10px;
+    padding: 14px 16px;
     background: #111;
     border-bottom: 1px solid #222;
 }
@@ -127,16 +128,11 @@ function injectStyles() {
     font-size: 14px;
     color: #0D0D0D;
 }
-.hs-header-info {
-    display: flex;
-    flex-direction: column;
-}
 .hs-header-title {
     font-weight: 700;
     font-size: 14px;
-    color: #F5ECD7;
 }
-.hs-header-score {
+.hs-header-sub {
     font-size: 12px;
     color: #C9A84C;
     margin-top: 1px;
@@ -147,11 +143,9 @@ function injectStyles() {
     color: #777;
     font-size: 22px;
     cursor: pointer;
-    padding: 4px 6px;
-    line-height: 1;
+    padding: 4px;
 }
 
-/* Вкладки */
 .hs-tabs {
     display: flex;
     background: #0f0f0f;
@@ -172,31 +166,27 @@ function injectStyles() {
     border-bottom-color: #C9A84C;
 }
 
-/* Тело */
 .hs-body {
     padding: 16px;
     overflow-y: auto;
     flex: 1;
-    -webkit-overflow-scrolling: touch;
 }
 
-/* Обзор */
 .hs-big-score {
     font-size: 48px;
     font-weight: 800;
     color: var(--hs-accent, #C9A84C);
     line-height: 1;
-    margin-bottom: 2px;
 }
-.hs-type-label {
+.hs-type {
     font-size: 12px;
     text-transform: uppercase;
-    letter-spacing: 0.8px;
+    letter-spacing: 0.6px;
     opacity: 0.5;
-    margin-bottom: 18px;
+    margin: 4px 0 18px;
 }
 
-.hs-status-row {
+.hs-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -204,18 +194,34 @@ function injectStyles() {
     border-bottom: 1px solid #1a1a1a;
     font-size: 14px;
 }
-.hs-status-row:last-of-type {
-    border-bottom: none;
-    margin-bottom: 8px;
+.hs-row:last-child { border-bottom: none; }
+
+.hs-switch {
+    width: 44px;
+    height: 24px;
+    background: #333;
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
 }
-.hs-status-value {
-    font-weight: 600;
-    font-size: 13px;
+.hs-switch.on { background: #C9A84C; }
+.hs-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
 }
+.hs-switch.on::after { transform: translateX(20px); }
 
 .hs-btn {
     width: 100%;
-    margin-top: 12px;
+    margin-top: 14px;
     padding: 13px;
     border: none;
     border-radius: 11px;
@@ -233,39 +239,9 @@ function injectStyles() {
     margin-top: 8px;
 }
 
-/* Переключатели */
-.hs-switch {
-    width: 44px;
-    height: 24px;
-    background: #333;
-    border-radius: 12px;
-    position: relative;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background 0.2s;
-}
-.hs-switch.on {
-    background: #C9A84C;
-}
-.hs-switch::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 20px;
-    height: 20px;
-    background: #fff;
-    border-radius: 50%;
-    transition: transform 0.2s;
-}
-.hs-switch.on::after {
-    transform: translateX(20px);
-}
-
-/* NPC */
 .hs-npc-empty {
     text-align: center;
-    padding: 30px 10px;
+    padding: 28px 10px;
     opacity: 0.4;
     font-size: 13px;
     line-height: 1.5;
@@ -273,7 +249,6 @@ function injectStyles() {
 .hs-npc-item {
     display: flex;
     justify-content: space-between;
-    align-items: center;
     padding: 10px 0;
     border-bottom: 1px solid #1a1a1a;
     font-size: 14px;
@@ -283,12 +258,11 @@ function injectStyles() {
     color: #C9A84C;
 }
 
-/* Отладка */
 .hs-debug-line {
     font-family: monospace;
     font-size: 12px;
     opacity: 0.7;
-    margin-bottom: 7px;
+    margin-bottom: 6px;
 }
 `;
     document.head.appendChild(s);
@@ -297,9 +271,10 @@ function injectStyles() {
 function buildStar(score, type) {
     const accent = getAccent(type);
     const fillOpacity = 0.18 + (score / 100) * 0.55;
+    const speed = score > 80 ? '0.7s' : score > 50 ? '0.95s' : '1.25s';
 
     return `
-<svg viewBox="0 0 100 100" width="100%" height="100%" class="hs-spin" style="--hs-accent:${accent}">
+<svg viewBox="0 0 100 100" width="100%" height="100%" class="hs-pulse" style="--hs-accent:\( {accent}; --spd: \){speed}">
   <defs>
     <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="${accent}" stop-opacity="0.95"/>
@@ -330,7 +305,7 @@ function createWidget() {
     let isDragging = false, hasMoved = false;
     let offsetX = 0, offsetY = 0, startX = 0, startY = 0, lastTap = 0;
 
-    w.addEventListener('pointerdown', (e) => {
+    w.addEventListener('pointerdown', e => {
         const rect = w.getBoundingClientRect();
         offsetX = e.clientX - rect.left;
         offsetY = e.clientY - rect.top;
@@ -343,29 +318,29 @@ function createWidget() {
         e.stopPropagation();
     });
 
-    w.addEventListener('pointermove', (e) => {
+    w.addEventListener('pointermove', e => {
         if (!isDragging) return;
         if (Math.abs(e.clientX - startX) > 6 || Math.abs(e.clientY - startY) > 6) hasMoved = true;
         if (!hasMoved) return;
 
-        let left = e.clientX - offsetX;
-        let top = e.clientY - offsetY;
-        left = Math.max(4, Math.min(window.innerWidth - 90, left));
-        top = Math.max(4, Math.min(window.innerHeight - 100, top));
+        let left = Math.max(4, Math.min(window.innerWidth - 90, e.clientX - offsetX));
+        let top = Math.max(4, Math.min(window.innerHeight - 100, e.clientY - offsetY));
         w.style.left = left + 'px';
         w.style.top = top + 'px';
         w.style.right = 'auto';
         w.style.bottom = 'auto';
     });
 
-    w.addEventListener('pointerup', (e) => {
+    w.addEventListener('pointerup', e => {
         if (!isDragging) return;
         isDragging = false;
+
         if (hasMoved) {
             cfg().widgetPos = { top: w.style.top, left: w.style.left };
             save();
             return;
         }
+
         const now = Date.now();
         if (now - lastTap < 300) {
             lastTap = 0;
@@ -405,7 +380,6 @@ function flashWidget() {
     w.classList.add('hs-flash');
 }
 
-// ===================== ПАНЕЛЬ =====================
 let currentTab = 'overview';
 
 function openPanel() {
@@ -415,7 +389,7 @@ function openPanel() {
         ov.id = 'hs-overlay';
         ov.innerHTML = '<div id="hs-panel"></div>';
         document.body.appendChild(ov);
-        ov.addEventListener('click', (e) => {
+        ov.addEventListener('click', e => {
             if (e.target === ov) closePanel();
         });
     }
@@ -438,9 +412,9 @@ function renderPanel() {
         <div class="hs-header">
             <div class="hs-header-left">
                 <div class="hs-header-icon">✦</div>
-                <div class="hs-header-info">
+                <div>
                     <div class="hs-header-title">Heartbeat Sync</div>
-                    <div class="hs-header-score">${c.score}% · ${c.relationType}</div>
+                    <div class="hs-header-sub">${c.score}% · ${c.relationType}</div>
                 </div>
             </div>
             <button class="hs-close" id="hs-close">×</button>
@@ -467,21 +441,20 @@ function renderPanel() {
 
     const body = document.getElementById('hs-body');
 
-    // ===== ОБЗОР =====
     if (currentTab === 'overview') {
         body.innerHTML = `
             <div class="hs-big-score">${c.score}%</div>
-            <div class="hs-type-label">${c.relationType}</div>
+            <div class="hs-type">${c.relationType}</div>
 
-            <div class="hs-status-row">
+            <div class="hs-row">
                 <span>Сенсоры</span>
-                <span class="hs-status-value" style="color:${c.sensorsActive ? '#C9A84C' : '#666'}">
+                <span style="color:${c.sensorsActive ? '#C9A84C' : '#666'}; font-weight:600">
                     ${c.sensorsActive ? 'ACTIVE' : 'OFF'}
                 </span>
             </div>
-            <div class="hs-status-row">
+            <div class="hs-row">
                 <span>Анимации</span>
-                <span class="hs-status-value" style="color:${c.animations ? '#C9A84C' : '#666'}">
+                <span style="color:${c.animations ? '#C9A84C' : '#666'}; font-weight:600">
                     ${c.animations ? 'ON' : 'OFF'}
                 </span>
             </div>
@@ -499,19 +472,17 @@ function renderPanel() {
         };
     }
 
-    // ===== НАСТРОЙКИ =====
     if (currentTab === 'settings') {
         body.innerHTML = `
-            <div class="hs-status-row">
-                <span>Анимации звезды</span>
+            <div class="hs-row">
+                <span>Анимации</span>
                 <div class="hs-switch ${c.animations ? 'on' : ''}" id="hs-anim"></div>
             </div>
-            <div class="hs-status-row">
+            <div class="hs-row">
                 <span>Сенсоры</span>
                 <div class="hs-switch ${c.sensorsActive ? 'on' : ''}" id="hs-sensors"></div>
             </div>
-
-            <button class="hs-btn ghost" id="hs-reset">Сбросить позицию виджета</button>
+            <button class="hs-btn ghost" id="hs-reset">Сбросить позицию</button>
         `;
 
         document.getElementById('hs-anim').onclick = () => {
@@ -520,13 +491,11 @@ function renderPanel() {
             updateWidget();
             renderPanel();
         };
-
         document.getElementById('hs-sensors').onclick = () => {
             c.sensorsActive = !c.sensorsActive;
             save();
             renderPanel();
         };
-
         document.getElementById('hs-reset').onclick = () => {
             c.widgetPos = null;
             save();
@@ -541,40 +510,29 @@ function renderPanel() {
         };
     }
 
-    // ===== NPC =====
     if (currentTab === 'npc') {
-        if (c.npcs.length === 0) {
-            body.innerHTML = `
-                <div class="hs-npc-empty">
-                    Пока нет NPC<br><br>
-                    Они появятся автоматически<br>
-                    через теги <code>{{HS::NPC:Имя:XX}}</code>
-                </div>
-            `;
-        } else {
-            body.innerHTML = c.npcs.map(n => `
+        body.innerHTML = c.npcs.length === 0
+            ? `<div class="hs-npc-empty">Пока нет NPC<br><br>Появятся через тег<br>{{HS::NPC:Имя:XX}}</div>`
+            : c.npcs.map(n => `
                 <div class="hs-npc-item">
                     <span>${n.name}</span>
                     <span class="hs-npc-score">${n.score}%</span>
                 </div>
             `).join('');
-        }
     }
 
-    // ===== ОТЛАДКА =====
     if (currentTab === 'debug') {
         body.innerHTML = `
             <div class="hs-debug-line">score: ${c.score}</div>
             <div class="hs-debug-line">type: ${c.relationType}</div>
             <div class="hs-debug-line">sensors: ${c.sensorsActive}</div>
             <div class="hs-debug-line">animations: ${c.animations}</div>
-            <div class="hs-debug-line">npcs count: ${c.npcs.length}</div>
+            <div class="hs-debug-line">npcs: ${c.npcs.length}</div>
             <div class="hs-debug-line">accent: ${getAccent(c.relationType)}</div>
         `;
     }
 }
 
-// ===================== ПАРСЕР =====================
 const RE_SYNC = /{{HS::SYNC:(\d{1,3})}}/gi;
 const RE_TYPE = /{{HS::TYPE:([^}]+)}}/gi;
 const RE_NPC  = /{{HS::NPC:([^:]+):(\d{1,3})}}/gi;
@@ -627,7 +585,7 @@ function addWand() {
     item.id = 'hs-wand';
     item.className = 'list-group-item flex-container flexGap5 interactable';
     item.innerHTML = '<i class="fa-solid fa-star" style="color:#C9A84C"></i><span>Heartbeat Sync</span>';
-    item.onclick = (e) => {
+    item.onclick = e => {
         e.stopPropagation();
         openPanel();
     };
@@ -657,7 +615,7 @@ jQuery(() => {
             });
         }
 
-        console.log('[HS] v5.0 — full panel rebuild');
+        console.log('[HS] v5.1 — pulse + tabs');
     } catch (e) {
         console.error('[HS]', e);
     }
