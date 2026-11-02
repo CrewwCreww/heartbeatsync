@@ -10,12 +10,12 @@ export const defaultSettings = {
     sensorsActive: false,
     widgetPos: null,
     milestones: [
-        { id: 'trust', name: 'Доверие', threshold: 35, done: false },
-        { id: 'confession', name: 'Признание', threshold: 60, done: false },
-        { id: 'kiss', name: 'Поцелуй', threshold: 75, done: false },
-        { id: 'sync', name: 'Полная синхронизация', threshold: 95, done: false },
+        { name: 'Доверие', threshold: 35, done: false },
+        { name: 'Признание', threshold: 60, done: false },
+        { name: 'Поцелуй', threshold: 75, done: false },
+        { name: 'Полная синхронизация', threshold: 95, done: false },
     ],
-    npcs: [], // { name, score }
+    npcs: [],
 };
 
 export function cfg() {
@@ -30,5 +30,7 @@ export function cfg() {
 }
 
 export function save() {
-    saveSettingsDebounced();
+    try {
+        saveSettingsDebounced();
+    } catch (e) {}
 }
