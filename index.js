@@ -9,7 +9,7 @@ const defaults = {
     sensorsActive: false,
     animations: true,
     widgetPos: null,
-    npcs: [] // { name, score, type }
+    npcs: []
 };
 
 function cfg() {
@@ -23,7 +23,6 @@ function save() {
     try { saveSettingsDebounced(); } catch {}
 }
 
-// ===================== ЦВЕТА =====================
 const TYPE_COLORS = {
     neutral:    '#C9A84C',
     romance:    '#9E0E18',
@@ -38,35 +37,35 @@ function getAccent(type) {
     return TYPE_COLORS[type] || TYPE_COLORS.neutral;
 }
 
-// ===================== СТИЛИ =====================
 function injectStyles() {
     if (document.getElementById('hs-css')) return;
 
     const s = document.createElement('style');
     s.id = 'hs-css';
     s.textContent = `
+/* ===== ВИДЖЕТ ===== */
 #hs-widget {
     position: fixed !important;
     top: 120px !important;
     left: 16px !important;
-    width: 78px !important;
-    height: 78px !important;
+    width: 76px !important;
+    height: 76px !important;
     z-index: 999990 !important;
     cursor: grab !important;
     user-select: none !important;
     touch-action: none !important;
-    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.6));
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.55));
 }
 #hs-widget:active { cursor: grabbing !important; }
-#hs-widget.hs-flash { animation: hsFlash 0.55s ease; }
+#hs-widget.hs-flash { animation: hsFlash 0.5s ease; }
 @keyframes hsFlash {
     0% { filter: brightness(1); transform: scale(1); }
-    40% { filter: brightness(1.4) drop-shadow(0 0 18px var(--hs-accent)); transform: scale(1.1); }
+    40% { filter: brightness(1.35) drop-shadow(0 0 16px var(--hs-accent)); transform: scale(1.08); }
     100% { filter: brightness(1); transform: scale(1); }
 }
 .hs-spin {
-    animation: hsSpin 12s linear infinite;
-    transform-origin: center;
+    animation: hsSpin 16s linear infinite;
+    transform-origin: center center;
 }
 .hs-no-anim .hs-spin { animation: none !important; }
 @keyframes hsSpin {
@@ -74,39 +73,43 @@ function injectStyles() {
     to { transform: rotate(360deg); }
 }
 
+/* ===== ОВЕРЛЕЙ И ПАНЕЛЬ ===== */
 #hs-overlay {
     position: fixed !important;
     inset: 0 !important;
-    background: rgba(0,0,0,0.78) !important;
+    background: rgba(0,0,0,0.72) !important;
     z-index: 1000000 !important;
     display: none !important;
-    align-items: center !important;
+    align-items: flex-end !important;
     justify-content: center !important;
-    padding: 14px !important;
+    padding: 0 !important;
 }
 #hs-overlay.show { display: flex !important; }
 
 #hs-panel {
-    width: min(380px, 96vw) !important;
-    max-height: 88vh !important;
+    width: 100% !important;
+    max-width: 420px !important;
+    max-height: 82vh !important;
     background: #0D0D0D !important;
-    border: 1px solid #3B2314 !important;
-    border-radius: 16px !important;
-    overflow: hidden !important;
+    border-radius: 18px 18px 0 0 !important;
+    border: 1px solid #2a2a2a !important;
+    border-bottom: none !important;
     color: #F5ECD7 !important;
     font-family: system-ui, -apple-system, sans-serif !important;
-    box-shadow: 0 25px 60px rgba(0,0,0,0.65);
-    display: flex;
-    flex-direction: column;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
 }
 
+/* Шапка */
 .hs-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 16px;
-    background: linear-gradient(90deg, #1A1A1A, #0D0D0D);
-    border-bottom: 1px solid #3B2314;
+    padding: 14px 16px 10px;
+    background: #111;
+    border-bottom: 1px solid #222;
 }
 .hs-header-left {
     display: flex;
@@ -114,81 +117,123 @@ function injectStyles() {
     gap: 10px;
 }
 .hs-header-icon {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     border-radius: 8px;
     background: linear-gradient(135deg, #C9A84C, #9E0E18);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 15px;
+    font-size: 14px;
+    color: #0D0D0D;
+}
+.hs-header-info {
+    display: flex;
+    flex-direction: column;
 }
 .hs-header-title {
     font-weight: 700;
-    font-size: 15px;
+    font-size: 14px;
     color: #F5ECD7;
+}
+.hs-header-score {
+    font-size: 12px;
+    color: #C9A84C;
+    margin-top: 1px;
 }
 .hs-close {
     background: none;
     border: none;
-    color: #888;
-    font-size: 20px;
+    color: #777;
+    font-size: 22px;
     cursor: pointer;
-    padding: 4px;
+    padding: 4px 6px;
+    line-height: 1;
 }
 
+/* Вкладки */
 .hs-tabs {
     display: flex;
-    border-bottom: 1px solid #3B2314;
-    background: #111;
-    overflow-x: auto;
+    background: #0f0f0f;
+    border-bottom: 1px solid #222;
 }
 .hs-tab {
     flex: 1;
     text-align: center;
-    padding: 11px 8px;
+    padding: 12px 4px;
     font-size: 12px;
     font-weight: 600;
-    color: #888;
+    color: #777;
     cursor: pointer;
     border-bottom: 2px solid transparent;
-    white-space: nowrap;
 }
 .hs-tab.active {
     color: #C9A84C;
     border-bottom-color: #C9A84C;
 }
 
+/* Тело */
 .hs-body {
     padding: 16px;
     overflow-y: auto;
     flex: 1;
+    -webkit-overflow-scrolling: touch;
 }
 
-.hs-score {
-    font-size: 42px;
+/* Обзор */
+.hs-big-score {
+    font-size: 48px;
     font-weight: 800;
     color: var(--hs-accent, #C9A84C);
     line-height: 1;
+    margin-bottom: 2px;
 }
-.hs-type {
-    font-size: 13px;
-    opacity: 0.55;
-    margin: 4px 0 16px;
+.hs-type-label {
+    font-size: 12px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.8px;
+    opacity: 0.5;
+    margin-bottom: 18px;
 }
 
-.hs-row {
+.hs-status-row {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    padding: 10px 0;
+    align-items: center;
+    padding: 11px 0;
+    border-bottom: 1px solid #1a1a1a;
     font-size: 14px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
 }
-.hs-row:last-child { border-bottom: none; }
+.hs-status-row:last-of-type {
+    border-bottom: none;
+    margin-bottom: 8px;
+}
+.hs-status-value {
+    font-weight: 600;
+    font-size: 13px;
+}
 
+.hs-btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 13px;
+    border: none;
+    border-radius: 11px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+}
+.hs-btn.primary {
+    background: linear-gradient(135deg, #C9A84C, #9E0E18);
+    color: #0D0D0D;
+}
+.hs-btn.ghost {
+    background: #1a1a1a;
+    color: #ccc;
+    margin-top: 8px;
+}
+
+/* Переключатели */
 .hs-switch {
     width: 44px;
     height: 24px;
@@ -196,8 +241,8 @@ function injectStyles() {
     border-radius: 12px;
     position: relative;
     cursor: pointer;
-    transition: background 0.2s;
     flex-shrink: 0;
+    transition: background 0.2s;
 }
 .hs-switch.on {
     background: #C9A84C;
@@ -217,85 +262,57 @@ function injectStyles() {
     transform: translateX(20px);
 }
 
-.hs-btn {
-    width: 100%;
-    margin-top: 14px;
-    padding: 12px;
-    border: none;
-    border-radius: 10px;
-    font-weight: 700;
+/* NPC */
+.hs-npc-empty {
+    text-align: center;
+    padding: 30px 10px;
+    opacity: 0.4;
     font-size: 13px;
-    cursor: pointer;
-    background: linear-gradient(135deg, #C9A84C, #9E0E18);
-    color: #0D0D0D;
+    line-height: 1.5;
 }
-.hs-btn.ghost {
-    background: rgba(255,255,255,0.06);
-    color: #ccc;
-    margin-top: 8px;
-}
-
 .hs-npc-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    font-size: 13px;
+    padding: 10px 0;
+    border-bottom: 1px solid #1a1a1a;
+    font-size: 14px;
 }
 .hs-npc-score {
     font-weight: 700;
     color: #C9A84C;
 }
 
+/* Отладка */
 .hs-debug-line {
+    font-family: monospace;
     font-size: 12px;
     opacity: 0.7;
-    margin-bottom: 6px;
-    font-family: monospace;
+    margin-bottom: 7px;
 }
 `;
     document.head.appendChild(s);
 }
 
-// ===================== ЗВЕЗДА =====================
 function buildStar(score, type) {
     const accent = getAccent(type);
-    const fillOpacity = 0.15 + (score / 100) * 0.55;
+    const fillOpacity = 0.18 + (score / 100) * 0.55;
 
     return `
 <svg viewBox="0 0 100 100" width="100%" height="100%" class="hs-spin" style="--hs-accent:${accent}">
   <defs>
     <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="${accent}" stop-opacity="0.9"/>
-      <stop offset="100%" stop-color="#3B2314" stop-opacity="0.8"/>
+      <stop offset="0%" stop-color="${accent}" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#3B2314" stop-opacity="0.85"/>
     </linearGradient>
   </defs>
-
-  <!-- внешнее кольцо -->
-  <circle cx="50" cy="50" r="46" fill="none" stroke="${accent}" stroke-width="1.2" opacity="0.35"/>
-  <circle cx="50" cy="50" r="42" fill="none" stroke="#C9A84C" stroke-width="0.6" opacity="0.25"/>
-
-  <!-- звезда (8 лучей в стиле наброска) -->
-  <path d="M50 8
-           L56 38 L88 32 L64 50
-           L88 68 L56 62 L50 92
-           L44 62 L12 68 L36 50
-           L12 32 L44 38 Z"
-        fill="url(#starGrad)"
-        fill-opacity="${fillOpacity}"
-        stroke="${accent}"
-        stroke-width="1.4"
-        stroke-linejoin="round"/>
-
-  <!-- внутренний ромб -->
+  <circle cx="50" cy="50" r="46" fill="none" stroke="${accent}" stroke-width="1.1" opacity="0.28"/>
+  <circle cx="50" cy="50" r="41" fill="none" stroke="#C9A84C" stroke-width="0.5" opacity="0.2"/>
+  <path d="M50 8 L56 38 L88 32 L64 50 L88 68 L56 62 L50 92 L44 62 L12 68 L36 50 L12 32 L44 38 Z"
+        fill="url(#starGrad)" fill-opacity="${fillOpacity}"
+        stroke="${accent}" stroke-width="1.3" stroke-linejoin="round"/>
   <path d="M50 28 L58 50 L50 72 L42 50 Z"
-        fill="${accent}"
-        fill-opacity="0.35"
-        stroke="${accent}"
-        stroke-width="0.8"/>
-
-  <!-- процент -->
+        fill="\( {accent}" fill-opacity="0.3" stroke=" \){accent}" stroke-width="0.7"/>
   <text x="50" y="54" text-anchor="middle" fill="#F5ECD7" font-size="14" font-weight="700" font-family="monospace">${Math.round(score)}</text>
 </svg>`;
 }
@@ -310,11 +327,8 @@ function createWidget() {
     w.innerHTML = buildStar(cfg().score, cfg().relationType);
     document.body.appendChild(w);
 
-    let isDragging = false;
-    let hasMoved = false;
-    let offsetX = 0, offsetY = 0;
-    let startX = 0, startY = 0;
-    let lastTap = 0;
+    let isDragging = false, hasMoved = false;
+    let offsetX = 0, offsetY = 0, startX = 0, startY = 0, lastTap = 0;
 
     w.addEventListener('pointerdown', (e) => {
         const rect = w.getBoundingClientRect();
@@ -331,16 +345,13 @@ function createWidget() {
 
     w.addEventListener('pointermove', (e) => {
         if (!isDragging) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) hasMoved = true;
+        if (Math.abs(e.clientX - startX) > 6 || Math.abs(e.clientY - startY) > 6) hasMoved = true;
         if (!hasMoved) return;
 
         let left = e.clientX - offsetX;
         let top = e.clientY - offsetY;
         left = Math.max(4, Math.min(window.innerWidth - 90, left));
         top = Math.max(4, Math.min(window.innerHeight - 100, top));
-
         w.style.left = left + 'px';
         w.style.top = top + 'px';
         w.style.right = 'auto';
@@ -350,15 +361,13 @@ function createWidget() {
     w.addEventListener('pointerup', (e) => {
         if (!isDragging) return;
         isDragging = false;
-
         if (hasMoved) {
             cfg().widgetPos = { top: w.style.top, left: w.style.left };
             save();
             return;
         }
-
         const now = Date.now();
-        if (now - lastTap < 320) {
+        if (now - lastTap < 300) {
             lastTap = 0;
             e.preventDefault();
             e.stopPropagation();
@@ -429,7 +438,10 @@ function renderPanel() {
         <div class="hs-header">
             <div class="hs-header-left">
                 <div class="hs-header-icon">✦</div>
-                <div class="hs-header-title">Heartbeat Sync</div>
+                <div class="hs-header-info">
+                    <div class="hs-header-title">Heartbeat Sync</div>
+                    <div class="hs-header-score">${c.score}% · ${c.relationType}</div>
+                </div>
             </div>
             <button class="hs-close" id="hs-close">×</button>
         </div>
@@ -458,19 +470,23 @@ function renderPanel() {
     // ===== ОБЗОР =====
     if (currentTab === 'overview') {
         body.innerHTML = `
-            <div class="hs-score">${c.score}%</div>
-            <div class="hs-type">${c.relationType}</div>
+            <div class="hs-big-score">${c.score}%</div>
+            <div class="hs-type-label">${c.relationType}</div>
 
-            <div class="hs-row">
+            <div class="hs-status-row">
                 <span>Сенсоры</span>
-                <span style="color:\( {c.sensorsActive ? '#C9A84C' : '#666'}"> \){c.sensorsActive ? 'ACTIVE' : 'OFF'}</span>
+                <span class="hs-status-value" style="color:${c.sensorsActive ? '#C9A84C' : '#666'}">
+                    ${c.sensorsActive ? 'ACTIVE' : 'OFF'}
+                </span>
             </div>
-            <div class="hs-row">
+            <div class="hs-status-row">
                 <span>Анимации</span>
-                <span style="color:\( {c.animations ? '#C9A84C' : '#666'}"> \){c.animations ? 'ON' : 'OFF'}</span>
+                <span class="hs-status-value" style="color:${c.animations ? '#C9A84C' : '#666'}">
+                    ${c.animations ? 'ON' : 'OFF'}
+                </span>
             </div>
 
-            <button class="hs-btn" id="hs-act">
+            <button class="hs-btn primary" id="hs-act">
                 ${c.sensorsActive ? 'Sensors Active' : 'Activate Sensors'}
             </button>
         `;
@@ -486,11 +502,11 @@ function renderPanel() {
     // ===== НАСТРОЙКИ =====
     if (currentTab === 'settings') {
         body.innerHTML = `
-            <div class="hs-row">
+            <div class="hs-status-row">
                 <span>Анимации звезды</span>
                 <div class="hs-switch ${c.animations ? 'on' : ''}" id="hs-anim"></div>
             </div>
-            <div class="hs-row">
+            <div class="hs-status-row">
                 <span>Сенсоры</span>
                 <div class="hs-switch ${c.sensorsActive ? 'on' : ''}" id="hs-sensors"></div>
             </div>
@@ -527,21 +543,22 @@ function renderPanel() {
 
     // ===== NPC =====
     if (currentTab === 'npc') {
-        body.innerHTML = `
-            <div style="font-size:13px;opacity:0.6;margin-bottom:12px">
-                Отслеживание отношений с несколькими персонажами
-            </div>
-            ${c.npcs.length === 0 ? `
-                <div style="opacity:0.4;font-size:13px;padding:20px 0;text-align:center">
-                    Пока нет NPC.<br>Они появятся через теги {{HS::NPC:Имя:XX}}
+        if (c.npcs.length === 0) {
+            body.innerHTML = `
+                <div class="hs-npc-empty">
+                    Пока нет NPC<br><br>
+                    Они появятся автоматически<br>
+                    через теги <code>{{HS::NPC:Имя:XX}}</code>
                 </div>
-            ` : c.npcs.map(n => `
+            `;
+        } else {
+            body.innerHTML = c.npcs.map(n => `
                 <div class="hs-npc-item">
                     <span>${n.name}</span>
                     <span class="hs-npc-score">${n.score}%</span>
                 </div>
-            `).join('')}
-        `;
+            `).join('');
+        }
     }
 
     // ===== ОТЛАДКА =====
@@ -551,7 +568,7 @@ function renderPanel() {
             <div class="hs-debug-line">type: ${c.relationType}</div>
             <div class="hs-debug-line">sensors: ${c.sensorsActive}</div>
             <div class="hs-debug-line">animations: ${c.animations}</div>
-            <div class="hs-debug-line">npcs: ${c.npcs.length}</div>
+            <div class="hs-debug-line">npcs count: ${c.npcs.length}</div>
             <div class="hs-debug-line">accent: ${getAccent(c.relationType)}</div>
         `;
     }
@@ -601,7 +618,6 @@ function parseMessage(text) {
     }
 }
 
-// ===================== WAND =====================
 function addWand() {
     if (document.getElementById('hs-wand')) return true;
     const menu = document.getElementById('extensionsMenu');
@@ -619,7 +635,6 @@ function addWand() {
     return true;
 }
 
-// ===================== INIT =====================
 jQuery(() => {
     try {
         injectStyles();
@@ -642,7 +657,7 @@ jQuery(() => {
             });
         }
 
-        console.log('[HS] v4.0 — star + 4 tabs');
+        console.log('[HS] v5.0 — full panel rebuild');
     } catch (e) {
         console.error('[HS]', e);
     }
