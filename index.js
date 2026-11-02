@@ -5,10 +5,11 @@ const EXT = 'heartbeat-sync';
 
 const defaults = {
     score: 42,
+    relationType: 'neutral',
     sensorsActive: false,
     animations: true,
     widgetPos: null,
-    relationType: 'neutral'
+    npcs: [] // { name, score, type }
 };
 
 function cfg() {
@@ -22,6 +23,21 @@ function save() {
     try { saveSettingsDebounced(); } catch {}
 }
 
+// ===================== ЦВЕТА =====================
+const TYPE_COLORS = {
+    neutral:    '#C9A84C',
+    romance:    '#9E0E18',
+    friendship: '#C28D39',
+    rivalry:    '#3E4B8E',
+    obsession:  '#3D1534',
+    hostile:    '#640606',
+    family:     '#B5843A'
+};
+
+function getAccent(type) {
+    return TYPE_COLORS[type] || TYPE_COLORS.neutral;
+}
+
 // ===================== СТИЛИ =====================
 function injectStyles() {
     if (document.getElementById('hs-css')) return;
@@ -33,56 +49,53 @@ function injectStyles() {
     position: fixed !important;
     top: 120px !important;
     left: 16px !important;
-    width: 82px !important;
-    height: 94px !important;
+    width: 78px !important;
+    height: 78px !important;
     z-index: 999990 !important;
     cursor: grab !important;
     user-select: none !important;
     touch-action: none !important;
-    filter: drop-shadow(0 6px 16px rgba(180, 20, 40, 0.45));
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.6));
 }
 #hs-widget:active { cursor: grabbing !important; }
-#hs-widget.hs-flash { animation: hsFlash 0.6s ease; }
+#hs-widget.hs-flash { animation: hsFlash 0.55s ease; }
 @keyframes hsFlash {
     0% { filter: brightness(1); transform: scale(1); }
-    40% { filter: brightness(1.55) drop-shadow(0 0 22px #ff4d6d); transform: scale(1.12); }
+    40% { filter: brightness(1.4) drop-shadow(0 0 18px var(--hs-accent)); transform: scale(1.1); }
     100% { filter: brightness(1); transform: scale(1); }
 }
-.hs-beat { animation: hsBeat var(--spd, 1.05s) ease-in-out infinite; transform-origin: center; }
-.hs-no-anim .hs-beat { animation: none !important; }
-@keyframes hsBeat {
-    0%,100% { transform: scale(1); }
-    14% { transform: scale(1.07); }
-    28% { transform: scale(1); }
-    42% { transform: scale(1.04); }
-    56% { transform: scale(1); }
+.hs-spin {
+    animation: hsSpin 12s linear infinite;
+    transform-origin: center;
 }
-.hs-ecg { animation: hsEcg 1.3s linear infinite; }
-.hs-no-anim .hs-ecg { animation: none !important; }
-@keyframes hsEcg { to { stroke-dashoffset: -26; } }
+.hs-no-anim .hs-spin { animation: none !important; }
+@keyframes hsSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
 
 #hs-overlay {
     position: fixed !important;
     inset: 0 !important;
-    background: rgba(0,0,0,0.72) !important;
+    background: rgba(0,0,0,0.78) !important;
     z-index: 1000000 !important;
     display: none !important;
     align-items: center !important;
     justify-content: center !important;
-    padding: 12px !important;
+    padding: 14px !important;
 }
 #hs-overlay.show { display: flex !important; }
 
 #hs-panel {
     width: min(380px, 96vw) !important;
     max-height: 88vh !important;
+    background: #0D0D0D !important;
+    border: 1px solid #3B2314 !important;
+    border-radius: 16px !important;
     overflow: hidden !important;
-    background: #121014 !important;
-    border: 1px solid rgba(255, 80, 110, 0.25) !important;
-    border-radius: 18px !important;
-    color: #e8e0e4 !important;
+    color: #F5ECD7 !important;
     font-family: system-ui, -apple-system, sans-serif !important;
-    box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+    box-shadow: 0 25px 60px rgba(0,0,0,0.65);
     display: flex;
     flex-direction: column;
 }
@@ -90,54 +103,51 @@ function injectStyles() {
 .hs-header {
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: space-between;
     padding: 14px 16px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    flex-shrink: 0;
+    background: linear-gradient(90deg, #1A1A1A, #0D0D0D);
+    border-bottom: 1px solid #3B2314;
+}
+.hs-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 .hs-header-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 11px;
-    background: linear-gradient(135deg, #ff4d6d, #c9184a);
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #C9A84C, #9E0E18);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
-    flex-shrink: 0;
+    font-size: 15px;
 }
-.hs-header-text { flex: 1; min-width: 0; }
 .hs-header-title {
     font-weight: 700;
     font-size: 15px;
-    color: #fff;
-}
-.hs-header-sub {
-    font-size: 11px;
-    opacity: 0.45;
-    margin-top: 1px;
+    color: #F5ECD7;
 }
 .hs-close {
     background: none;
     border: none;
-    color: #777;
-    font-size: 22px;
+    color: #888;
+    font-size: 20px;
     cursor: pointer;
     padding: 4px;
-    line-height: 1;
 }
 
 .hs-tabs {
     display: flex;
-    gap: 0;
-    padding: 0 12px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    flex-shrink: 0;
+    border-bottom: 1px solid #3B2314;
+    background: #111;
     overflow-x: auto;
 }
 .hs-tab {
-    padding: 11px 14px;
-    font-size: 13px;
+    flex: 1;
+    text-align: center;
+    padding: 11px 8px;
+    font-size: 12px;
     font-weight: 600;
     color: #888;
     cursor: pointer;
@@ -145,8 +155,8 @@ function injectStyles() {
     white-space: nowrap;
 }
 .hs-tab.active {
-    color: #ff6b8a;
-    border-bottom-color: #ff4d6d;
+    color: #C9A84C;
+    border-bottom-color: #C9A84C;
 }
 
 .hs-body {
@@ -155,169 +165,138 @@ function injectStyles() {
     flex: 1;
 }
 
-.hs-score-row {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    margin-bottom: 6px;
-}
-.hs-score-big {
-    font-size: 36px;
+.hs-score {
+    font-size: 42px;
     font-weight: 800;
-    color: #ff6b8a;
+    color: var(--hs-accent, #C9A84C);
     line-height: 1;
-    letter-spacing: -0.5px;
-}
-.hs-score-max {
-    font-size: 14px;
-    opacity: 0.4;
 }
 .hs-type {
-    font-size: 12px;
-    opacity: 0.5;
-    margin-bottom: 18px;
-}
-
-.hs-card {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 12px;
-    padding: 12px 14px;
-    margin-bottom: 10px;
-}
-.hs-card-title {
-    font-size: 11px;
+    font-size: 13px;
+    opacity: 0.55;
+    margin: 4px 0 16px;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
-    opacity: 0.4;
-    margin-bottom: 8px;
+    letter-spacing: 0.5px;
 }
 
-.hs-toggle-row {
+.hs-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 0;
+    padding: 10px 0;
     font-size: 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
 }
+.hs-row:last-child { border-bottom: none; }
+
 .hs-switch {
     width: 44px;
-    height: 26px;
-    background: rgba(255,255,255,0.12);
-    border-radius: 13px;
+    height: 24px;
+    background: #333;
+    border-radius: 12px;
     position: relative;
     cursor: pointer;
     transition: background 0.2s;
     flex-shrink: 0;
 }
-.hs-switch.on { background: #ff4d6d; }
+.hs-switch.on {
+    background: #C9A84C;
+}
 .hs-switch::after {
     content: '';
     position: absolute;
-    top: 3px;
-    left: 3px;
+    top: 2px;
+    left: 2px;
     width: 20px;
     height: 20px;
     background: #fff;
     border-radius: 50%;
     transition: transform 0.2s;
 }
-.hs-switch.on::after { transform: translateX(18px); }
+.hs-switch.on::after {
+    transform: translateX(20px);
+}
 
 .hs-btn {
     width: 100%;
+    margin-top: 14px;
     padding: 12px;
     border: none;
-    border-radius: 11px;
+    border-radius: 10px;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
-    margin-top: 6px;
-}
-.hs-btn.primary {
-    background: linear-gradient(135deg, #ff4d6d, #c9184a);
-    color: #fff;
-}
-.hs-btn.primary.on {
-    background: linear-gradient(135deg, #2a9d8f, #1a6b63);
+    background: linear-gradient(135deg, #C9A84C, #9E0E18);
+    color: #0D0D0D;
 }
 .hs-btn.ghost {
     background: rgba(255,255,255,0.06);
     color: #ccc;
+    margin-top: 8px;
 }
 
-.hs-status-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+.hs-npc-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 13px;
 }
-.hs-status-item {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 10px;
-    padding: 10px;
-    text-align: center;
-}
-.hs-status-value {
-    font-size: 16px;
+.hs-npc-score {
     font-weight: 700;
-    color: #ff6b8a;
+    color: #C9A84C;
 }
-.hs-status-label {
-    font-size: 10px;
-    opacity: 0.45;
-    margin-top: 2px;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
+
+.hs-debug-line {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-bottom: 6px;
+    font-family: monospace;
 }
 `;
     document.head.appendChild(s);
 }
 
-// ===================== СЕРДЦЕ =====================
-function visual(score) {
-    const s = Math.max(0, Math.min(100, score));
-    if (s <= 20) return { h: 210, sat: 28, l: 36, spd: 1.45 };
-    if (s <= 50) return { h: 0, sat: 58, l: 40, spd: 1.05 };
-    if (s <= 80) return { h: 350, sat: 80, l: 48, spd: 0.78 };
-    return { h: 0, sat: 95, l: 52, spd: 0.52 };
-}
-
-function buildHeart(score) {
-    const v = visual(score);
-    const fill = `hsl(${v.h}, ${v.sat}%, ${v.l}%)`;
-    const vessel = `hsl(${v.h}, ${Math.min(100, v.sat + 12)}%, ${Math.min(68, v.l + 12)}%)`;
-    const fillH = (score / 100) * 80;
+// ===================== ЗВЕЗДА =====================
+function buildStar(score, type) {
+    const accent = getAccent(type);
+    const fillOpacity = 0.15 + (score / 100) * 0.55;
 
     return `
-<svg viewBox="0 0 100 112" width="100%" height="100%" class="hs-beat" style="--spd:${v.spd}s">
+<svg viewBox="0 0 100 100" width="100%" height="100%" class="hs-spin" style="--hs-accent:${accent}">
   <defs>
-    <clipPath id="hsclip">
-      <path d="M50 95 C50 95 15 69 15 42 C15 26 27 14 42 14 C47 14 50 18 50 18 C50 18 53 14 58 14 C73 14 85 26 85 42 C85 69 50 95 50 95 Z"/>
-    </clipPath>
-    <linearGradient id="hsglass" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="rgba(255,255,255,0.25)"/>
-      <stop offset="60%" stop-color="rgba(255,255,255,0.05)"/>
-      <stop offset="100%" stop-color="rgba(0,0,0,0.2)"/>
+    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${accent}" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#3B2314" stop-opacity="0.8"/>
     </linearGradient>
   </defs>
-  <path d="M50 95 C50 95 15 69 15 42 C15 26 27 14 42 14 C47 14 50 18 50 18 C50 18 53 14 58 14 C73 14 85 26 85 42 C85 69 50 95 50 95 Z"
-        fill="rgba(12,6,10,0.88)" stroke="rgba(255,80,110,0.5)" stroke-width="1.7"/>
-  <rect x="0" y="\( {95 - fillH}" width="100" height=" \){fillH}" clip-path="url(#hsclip)" fill="${fill}" opacity="0.9"/>
-  <g fill="none" stroke="${vessel}" stroke-width="1.1" opacity="0.85">
-    <path d="M37 35 Q45 47 42 61"/>
-    <path d="M63 33 Q55 48 58 62"/>
-    <path d="M50 25 Q48 43 50 67"/>
-    <path d="M33 50 Q41 56 48 53"/>
-    <path d="M67 48 Q59 56 52 54"/>
-  </g>
-  <path d="M50 95 C50 95 15 69 15 42 C15 26 27 14 42 14 C47 14 50 18 50 18 C50 18 53 14 58 14 C73 14 85 26 85 42 C85 69 50 95 50 95 Z"
-        fill="url(#hsglass)" opacity="0.55"/>
-  <polyline points="19,75 28,75 32,65 36,85 40,75 53,75 57,67 61,83 65,75 81,75"
-            fill="none" stroke="${vessel}" stroke-width="1.25" stroke-linecap="round"
-            stroke-dasharray="4.5 2.5" class="hs-ecg"/>
-  <text x="50" y="49" text-anchor="middle" fill="#fff" font-size="17" font-weight="700" font-family="monospace">${Math.round(score)}</text>
-  <text x="50" y="60" text-anchor="middle" fill="rgba(255,255,255,0.65)" font-size="8" font-family="monospace">%</text>
+
+  <!-- внешнее кольцо -->
+  <circle cx="50" cy="50" r="46" fill="none" stroke="${accent}" stroke-width="1.2" opacity="0.35"/>
+  <circle cx="50" cy="50" r="42" fill="none" stroke="#C9A84C" stroke-width="0.6" opacity="0.25"/>
+
+  <!-- звезда (8 лучей в стиле наброска) -->
+  <path d="M50 8
+           L56 38 L88 32 L64 50
+           L88 68 L56 62 L50 92
+           L44 62 L12 68 L36 50
+           L12 32 L44 38 Z"
+        fill="url(#starGrad)"
+        fill-opacity="${fillOpacity}"
+        stroke="${accent}"
+        stroke-width="1.4"
+        stroke-linejoin="round"/>
+
+  <!-- внутренний ромб -->
+  <path d="M50 28 L58 50 L50 72 L42 50 Z"
+        fill="${accent}"
+        fill-opacity="0.35"
+        stroke="${accent}"
+        stroke-width="0.8"/>
+
+  <!-- процент -->
+  <text x="50" y="54" text-anchor="middle" fill="#F5ECD7" font-size="14" font-weight="700" font-family="monospace">${Math.round(score)}</text>
 </svg>`;
 }
 
@@ -328,7 +307,7 @@ function createWidget() {
     w = document.createElement('div');
     w.id = 'hs-widget';
     if (!cfg().animations) w.classList.add('hs-no-anim');
-    w.innerHTML = buildHeart(cfg().score);
+    w.innerHTML = buildStar(cfg().score, cfg().relationType);
     document.body.appendChild(w);
 
     let isDragging = false;
@@ -360,7 +339,7 @@ function createWidget() {
         let left = e.clientX - offsetX;
         let top = e.clientY - offsetY;
         left = Math.max(4, Math.min(window.innerWidth - 90, left));
-        top = Math.max(4, Math.min(window.innerHeight - 110, top));
+        top = Math.max(4, Math.min(window.innerHeight - 100, top));
 
         w.style.left = left + 'px';
         w.style.top = top + 'px';
@@ -403,7 +382,7 @@ function createWidget() {
 function updateWidget() {
     const w = document.getElementById('hs-widget');
     if (!w) return;
-    w.innerHTML = buildHeart(cfg().score);
+    w.innerHTML = buildStar(cfg().score, cfg().relationType);
     if (!cfg().animations) w.classList.add('hs-no-anim');
     else w.classList.remove('hs-no-anim');
 }
@@ -411,6 +390,7 @@ function updateWidget() {
 function flashWidget() {
     const w = document.getElementById('hs-widget');
     if (!w || !cfg().animations) return;
+    w.style.setProperty('--hs-accent', getAccent(cfg().relationType));
     w.classList.remove('hs-flash');
     void w.offsetWidth;
     w.classList.add('hs-flash');
@@ -443,12 +423,13 @@ function renderPanel() {
     const panel = document.getElementById('hs-panel');
     if (!panel) return;
 
+    const accent = getAccent(c.relationType);
+
     panel.innerHTML = `
         <div class="hs-header">
-            <div class="hs-header-icon">❤️</div>
-            <div class="hs-header-text">
+            <div class="hs-header-left">
+                <div class="hs-header-icon">✦</div>
                 <div class="hs-header-title">Heartbeat Sync</div>
-                <div class="hs-header-sub">Синхронизация</div>
             </div>
             <button class="hs-close" id="hs-close">×</button>
         </div>
@@ -456,9 +437,11 @@ function renderPanel() {
         <div class="hs-tabs">
             <div class="hs-tab ${currentTab === 'overview' ? 'active' : ''}" data-tab="overview">Обзор</div>
             <div class="hs-tab ${currentTab === 'settings' ? 'active' : ''}" data-tab="settings">Настройки</div>
+            <div class="hs-tab ${currentTab === 'npc' ? 'active' : ''}" data-tab="npc">NPC</div>
+            <div class="hs-tab ${currentTab === 'debug' ? 'active' : ''}" data-tab="debug">Отладка</div>
         </div>
 
-        <div class="hs-body" id="hs-body"></div>
+        <div class="hs-body" id="hs-body" style="--hs-accent:${accent}"></div>
     `;
 
     document.getElementById('hs-close').onclick = closePanel;
@@ -472,30 +455,24 @@ function renderPanel() {
 
     const body = document.getElementById('hs-body');
 
+    // ===== ОБЗОР =====
     if (currentTab === 'overview') {
         body.innerHTML = `
-            <div class="hs-score-row">
-                <div class="hs-score-big">${c.score}</div>
-                <div class="hs-score-max">/ 100</div>
-            </div>
-            <div class="hs-type">${c.relationType || 'neutral'}</div>
+            <div class="hs-score">${c.score}%</div>
+            <div class="hs-type">${c.relationType}</div>
 
-            <div class="hs-status-grid">
-                <div class="hs-status-item">
-                    <div class="hs-status-value">${c.sensorsActive ? 'ON' : 'OFF'}</div>
-                    <div class="hs-status-label">Sensors</div>
-                </div>
-                <div class="hs-status-item">
-                    <div class="hs-status-value">${c.animations ? 'ON' : 'OFF'}</div>
-                    <div class="hs-status-label">Анимации</div>
-                </div>
+            <div class="hs-row">
+                <span>Сенсоры</span>
+                <span style="color:\( {c.sensorsActive ? '#C9A84C' : '#666'}"> \){c.sensorsActive ? 'ACTIVE' : 'OFF'}</span>
+            </div>
+            <div class="hs-row">
+                <span>Анимации</span>
+                <span style="color:\( {c.animations ? '#C9A84C' : '#666'}"> \){c.animations ? 'ON' : 'OFF'}</span>
             </div>
 
-            <div style="margin-top: 16px">
-                <button class="hs-btn primary ${c.sensorsActive ? 'on' : ''}" id="hs-act">
-                    ${c.sensorsActive ? 'Sensors Active' : 'Activate Sensors'}
-                </button>
-            </div>
+            <button class="hs-btn" id="hs-act">
+                ${c.sensorsActive ? 'Sensors Active' : 'Activate Sensors'}
+            </button>
         `;
 
         document.getElementById('hs-act').onclick = () => {
@@ -506,41 +483,35 @@ function renderPanel() {
         };
     }
 
+    // ===== НАСТРОЙКИ =====
     if (currentTab === 'settings') {
         body.innerHTML = `
-            <div class="hs-card">
-                <div class="hs-card-title">Виджет</div>
-                <div class="hs-toggle-row">
-                    <span>Анимации сердца и ЭКГ</span>
-                    <div class="hs-switch ${c.animations ? 'on' : ''}" id="hs-anim-toggle"></div>
-                </div>
+            <div class="hs-row">
+                <span>Анимации звезды</span>
+                <div class="hs-switch ${c.animations ? 'on' : ''}" id="hs-anim"></div>
+            </div>
+            <div class="hs-row">
+                <span>Сенсоры</span>
+                <div class="hs-switch ${c.sensorsActive ? 'on' : ''}" id="hs-sensors"></div>
             </div>
 
-            <div class="hs-card">
-                <div class="hs-card-title">Сенсоры</div>
-                <div class="hs-toggle-row">
-                    <span>Авто-инъекция тегов</span>
-                    <div class="hs-switch ${c.sensorsActive ? 'on' : ''}" id="hs-sensors-toggle"></div>
-                </div>
-            </div>
-
-            <button class="hs-btn ghost" id="hs-reset-pos">Сбросить позицию виджета</button>
+            <button class="hs-btn ghost" id="hs-reset">Сбросить позицию виджета</button>
         `;
 
-        document.getElementById('hs-anim-toggle').onclick = () => {
+        document.getElementById('hs-anim').onclick = () => {
             c.animations = !c.animations;
             save();
             updateWidget();
             renderPanel();
         };
 
-        document.getElementById('hs-sensors-toggle').onclick = () => {
+        document.getElementById('hs-sensors').onclick = () => {
             c.sensorsActive = !c.sensorsActive;
             save();
             renderPanel();
         };
 
-        document.getElementById('hs-reset-pos').onclick = () => {
+        document.getElementById('hs-reset').onclick = () => {
             c.widgetPos = null;
             save();
             const w = document.getElementById('hs-widget');
@@ -553,6 +524,81 @@ function renderPanel() {
             try { toastr.info('Позиция сброшена'); } catch {}
         };
     }
+
+    // ===== NPC =====
+    if (currentTab === 'npc') {
+        body.innerHTML = `
+            <div style="font-size:13px;opacity:0.6;margin-bottom:12px">
+                Отслеживание отношений с несколькими персонажами
+            </div>
+            ${c.npcs.length === 0 ? `
+                <div style="opacity:0.4;font-size:13px;padding:20px 0;text-align:center">
+                    Пока нет NPC.<br>Они появятся через теги {{HS::NPC:Имя:XX}}
+                </div>
+            ` : c.npcs.map(n => `
+                <div class="hs-npc-item">
+                    <span>${n.name}</span>
+                    <span class="hs-npc-score">${n.score}%</span>
+                </div>
+            `).join('')}
+        `;
+    }
+
+    // ===== ОТЛАДКА =====
+    if (currentTab === 'debug') {
+        body.innerHTML = `
+            <div class="hs-debug-line">score: ${c.score}</div>
+            <div class="hs-debug-line">type: ${c.relationType}</div>
+            <div class="hs-debug-line">sensors: ${c.sensorsActive}</div>
+            <div class="hs-debug-line">animations: ${c.animations}</div>
+            <div class="hs-debug-line">npcs: ${c.npcs.length}</div>
+            <div class="hs-debug-line">accent: ${getAccent(c.relationType)}</div>
+        `;
+    }
+}
+
+// ===================== ПАРСЕР =====================
+const RE_SYNC = /{{HS::SYNC:(\d{1,3})}}/gi;
+const RE_TYPE = /{{HS::TYPE:([^}]+)}}/gi;
+const RE_NPC  = /{{HS::NPC:([^:]+):(\d{1,3})}}/gi;
+
+function parseMessage(text) {
+    if (!text) return;
+    const c = cfg();
+    let changed = false;
+
+    const syncs = [...text.matchAll(RE_SYNC)];
+    if (syncs.length) {
+        const v = Math.max(0, Math.min(100, parseInt(syncs.at(-1)[1], 10)));
+        if (v !== c.score) {
+            c.score = v;
+            changed = true;
+            flashWidget();
+        }
+    }
+
+    const types = [...text.matchAll(RE_TYPE)];
+    if (types.length) {
+        c.relationType = types.at(-1)[1].trim().toLowerCase();
+        changed = true;
+    }
+
+    [...text.matchAll(RE_NPC)].forEach(m => {
+        const name = m[1].trim();
+        const sc = Math.max(0, Math.min(100, parseInt(m[2], 10)));
+        let n = c.npcs.find(x => x.name.toLowerCase() === name.toLowerCase());
+        if (!n) c.npcs.push({ name, score: sc, type: 'neutral' });
+        else n.score = sc;
+        changed = true;
+    });
+
+    if (changed) {
+        save();
+        updateWidget();
+        if (document.getElementById('hs-overlay')?.classList.contains('show')) {
+            renderPanel();
+        }
+    }
 }
 
 // ===================== WAND =====================
@@ -564,7 +610,7 @@ function addWand() {
     const item = document.createElement('div');
     item.id = 'hs-wand';
     item.className = 'list-group-item flex-container flexGap5 interactable';
-    item.innerHTML = '<i class="fa-solid fa-heart-pulse" style="color:#ff4d6d"></i><span>Heartbeat Sync</span>';
+    item.innerHTML = '<i class="fa-solid fa-star" style="color:#C9A84C"></i><span>Heartbeat Sync</span>';
     item.onclick = (e) => {
         e.stopPropagation();
         openPanel();
@@ -591,22 +637,12 @@ jQuery(() => {
             eventSource.on(event_types.MESSAGE_RECEIVED, () => {
                 setTimeout(() => {
                     const el = document.querySelector('#chat .mes:last-child .mes_text');
-                    if (!el) return;
-                    const m = el.textContent.match(/{{HS::SYNC:(\d{1,3})}}/i);
-                    if (m) {
-                        const val = Math.min(100, parseInt(m[1], 10));
-                        if (val !== cfg().score) {
-                            cfg().score = val;
-                            save();
-                            updateWidget();
-                            flashWidget();
-                        }
-                    }
+                    if (el) parseMessage(el.textContent);
                 }, 350);
             });
         }
 
-        console.log('[HS] v3.4 — clean panel');
+        console.log('[HS] v4.0 — star + 4 tabs');
     } catch (e) {
         console.error('[HS]', e);
     }
