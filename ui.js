@@ -3,6 +3,7 @@ import { refreshWidget } from './heart.js';
 
 export function injectStyles() {
     if (document.getElementById('hs-styles')) return;
+
     const el = document.createElement('style');
     el.id = 'hs-styles';
     el.textContent = `
@@ -37,7 +38,8 @@ export function injectStyles() {
 @keyframes hsEcg { to { stroke-dashoffset: -28; } }
 
 #hs-overlay {
-    position: fixed; inset: 0;
+    position: fixed;
+    inset: 0;
     background: rgba(0,0,0,0.65);
     z-index: 1000000;
     display: none;
@@ -59,20 +61,64 @@ export function injectStyles() {
     font-family: system-ui, sans-serif;
 }
 .hs-title {
-    display: flex; justify-content: space-between; align-items: center;
-    font-weight: 700; font-size: 16px; color: #ff6b8a; margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    font-size: 16px;
+    color: #ff6b8a;
+    margin-bottom: 12px;
 }
-.hs-x { background: none; border: none; color: #aaa; font-size: 22px; cursor: pointer; }
-.hs-score { font-size: 32px; font-weight: 800; color: #ff6b8a; margin-bottom: 4px; }
-.hs-sub { font-size: 12px; opacity: 0.6; margin-bottom: 12px; }
-.hs-sec { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.45; margin: 12px 0 6px; }
-.hs-line { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.07); }
-.hs-line.done { opacity: 0.4; text-decoration: line-through; }
+.hs-x {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 22px;
+    cursor: pointer;
+}
+.hs-score {
+    font-size: 32px;
+    font-weight: 800;
+    color: #ff6b8a;
+    margin-bottom: 4px;
+}
+.hs-sub {
+    font-size: 12px;
+    opacity: 0.6;
+    margin-bottom: 12px;
+}
+.hs-sec {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.45;
+    margin: 12px 0 6px;
+}
+.hs-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.hs-line.done {
+    opacity: 0.4;
+    text-decoration: line-through;
+}
 .hs-btn {
-    width: 100%; margin-top: 14px; padding: 11px; border: none; border-radius: 10px;
-    background: linear-gradient(135deg, #ff4d6d, #c9184a); color: white; font-weight: 700; cursor: pointer;
+    width: 100%;
+    margin-top: 14px;
+    padding: 11px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #ff4d6d, #c9184a);
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
 }
-.hs-btn.on { background: linear-gradient(135deg, #2a9d8f, #1a6b63); }
+.hs-btn.on {
+    background: linear-gradient(135deg, #2a9d8f, #1a6b63);
+}
 `;
     document.head.appendChild(el);
 }
@@ -84,7 +130,9 @@ export function openPanel() {
         ov.id = 'hs-overlay';
         ov.innerHTML = '<div id="hs-panel"></div>';
         document.body.appendChild(ov);
-        ov.addEventListener('click', e => { if (e.target === ov) closePanel(); });
+        ov.addEventListener('click', e => {
+            if (e.target === ov) closePanel();
+        });
     }
 
     const c = cfg();
@@ -99,13 +147,17 @@ export function openPanel() {
         <div class="hs-sec">Достижения</div>
         ${c.milestones.map(m => `
             <div class="hs-line ${m.done ? 'done' : ''}">
-                <span>\( {m.name}</span><span> \){m.threshold}%</span>
+                <span>${m.name}</span>
+                <span>${m.threshold}%</span>
             </div>
         `).join('')}
         ${c.npcs.length ? `
             <div class="hs-sec">Другие связи</div>
             ${c.npcs.map(n => `
-                <div class="hs-line"><span>\( {n.name}</span><span> \){n.score}%</span></div>
+                <div class="hs-line">
+                    <span>${n.name}</span>
+                    <span>${n.score}%</span>
+                </div>
             `).join('')}
         ` : ''}
         <button class="hs-btn ${c.sensorsActive ? 'on' : ''}" id="hs-act">
@@ -117,7 +169,7 @@ export function openPanel() {
     document.getElementById('hs-act').onclick = () => {
         c.sensorsActive = true;
         save();
-        try { toastr.success('Сенсоры включены. Теги будут вырезаться из контекста.'); } catch {}
+        try { toastr.success('Сенсоры включены'); } catch {}
         openPanel();
     };
 
