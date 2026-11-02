@@ -5,15 +5,17 @@ export const EXT_NAME = 'heartbeat-sync';
 
 export const defaultSettings = {
     isEnabled: true,
-    score: 45,
+    score: 42,
+    relationType: 'neutral',
     sensorsActive: false,
     widgetPos: null,
     milestones: [
-        { name: 'Доверие', threshold: 35, done: false },
-        { name: 'Признание', threshold: 60, done: false },
-        { name: 'Поцелуй', threshold: 75, done: false },
-        { name: 'Полная синхронизация', threshold: 95, done: false },
+        { id: 'trust', name: 'Доверие', threshold: 35, done: false },
+        { id: 'confession', name: 'Признание', threshold: 60, done: false },
+        { id: 'kiss', name: 'Поцелуй', threshold: 75, done: false },
+        { id: 'sync', name: 'Полная синхронизация', threshold: 95, done: false },
     ],
+    npcs: [], // { name, score }
 };
 
 export function cfg() {
