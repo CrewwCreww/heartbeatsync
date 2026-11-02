@@ -5,11 +5,10 @@
         EVENT: '{{HS::EVENT:'
     };
 
-    // Состояние виджета
     let currentSync = 0;
-    let syncTrend = 'stable'; // up, down, stable
+    let syncTrend = 'stable';
 
-    // Безопасное получение данных
+    // Безопасное получение данных персонажа
     function getCharData() {
         const ctx = SillyTavern.getContext();
         const char = ctx?.characters?.[ctx.characterId];
@@ -19,29 +18,28 @@
         };
     }
 
-    // Обновление визуала сердца
+    // Обновление визуала сердца (Bio-Glass стиль)
     function updateHeartVisual(score, trend) {
         const heartIcon = document.getElementById('hs-heart-icon');
         const ecgLine = document.getElementById('hs-ecg-line');
         const scoreText = document.getElementById('hs-score-val');
         
-        if (!heartIcon) return;
+        if (!heartIcon || !scoreText) return;
 
-        // 1. Цвет и свечение зависят от счета
-        let color = '#555'; // Мертвый/Низкий
+        let color = '#555'; 
         let glow = 'none';
         let opacity = 0.3;
 
         if (score > 80) {
-            color = '#ff0040'; // Яркий красный
+            color = '#ff0040';
             glow = '0 0 15px #ff0040, inset 0 0 10px #ff0040';
             opacity = 1;
         } else if (score > 50) {
-            color = '#e74c3c'; // Нормальный красный
+            color = '#e74c3c';
             glow = '0 0 8px rgba(231, 76, 60, 0.6)';
             opacity = 0.8;
         } else if (score > 20) {
-            color = '#a93226'; // Темный красный
+            color = '#a93226';
             opacity = 0.6;
         }
 
@@ -50,33 +48,82 @@
         heartIcon.style.opacity = opacity;
         scoreText.innerText = score;
 
-        // 2. Анимация пульса зависит от тренда
         const duration = trend === 'up' ? '0.6s' : (trend === 'down' ? '1.2s' : '0.9s');
         heartIcon.style.animationDuration = duration;
         
-        // 3. Линия ЭКГ (имитация через CSS background position)
         if (trend !== 'stable') {
-            ecgLine.classList.add('active');
+            ecgLine?.classList.add('active');
         } else {
-            ecgLine.classList.remove('active');
+            ecgLine?.classList.remove('active');
         }
     }
 
-    // Генерация правил
+    // РЕАЛЬНАЯ генерация правил через API
     async function generateSyncRules() {
         const char = getCharData();
-        showToast(`⚡ Настройка сенсоров для ${char.name}...`, 'info');
+        const btn = document.getElementById('hs-init-btn');
         
-        // Здесь должен быть запрос к API, но для примера ставим заглушку
-        // В реальности тут fetch к /api/chat/completions
-        setTimeout(() => {
-            localStorage.setItem('hs_active', 'true');
-            showToast('✅ Сенсоры активны. Ожидание данных...', 'success');
-            updateHeartVisual(50, 'stable'); // Старт с 50%
-        }, 1000);
+        if (char.name === 'Unknown Subject') {
+            showToast('⚠️ Сначала выбери персонажа!', 'error');
+            return;
+        }
+
+        // Блокируем кнопку во время запроса
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = '⏳ Синхронизация...';
+        }
+
+        const systemPrompt = `Ты - система анализа эмоциональной синхронизации "Heartbeat Sync".
+На основе профиля "${char.name}" создай JSON-конфигурацию диапазонов синхронизации.
+Верни ТОЛЬКО валидный JSON без markdown:
+{
+  "sync_ranges": [
+    {"min": 0, "max": 20, "label": "Desynchronized", "color": "#555"},
+    {"min": 21, "max": 50, "label": "Stable Connection", "color": "#4a90e2"},
+    {"min": 51, "max": 80, "label": "Resonance", "color": "#9b59b6"},
+    {"min": 81, "max": 100, "label": "Perfect Sync", "color": "#e74c3c"}
+  ],
+  "triggers": [
+    {"action": "touch", "delta": 5},
+    {"action": "lie", "delta": -15}
+  ]
+}`;
+
+        try {
+            // Прямой запрос к подключенной нейросети через ST API
+            const response = await fetch('/api/chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    messages: [{ role: 'system', content: systemPrompt }],
+                    temperature: 0.7 
+                })
+            });
+            
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            
+            // Чистим ответ от markdown-блоков
+            let cleanJson = data.choices[0].message.content.replace(/```json|```/g, '').trim();
+            const rules = JSON.parse(cleanJson);
+            
+            localStorage.setItem('hs_rules_' + char.name, JSON.stringify(rules));
+            updateHeartVisual(50, 'stable'); // Старт с 50% после успешной настройки
+            showToast(`✅ Сенсоры активны для ${char.name}`, 'success');
+        } catch (e) {
+            console.error(e);
+            showToast(`❌ Ошибка связи: ${e.message}`, 'error');
+        } finally {
+            // Разблокируем кнопку
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = 'Activate Sensors';
+            }
+        }
     }
 
-    // Парсер сообщений (ловит теги в чате)
+    // Парсер тегов в сообщениях чата
     function parseMessageForTags(text) {
         const syncMatch = text.match(/{{HS::SYNC:(\d+)}}/);
         if (syncMatch) {
@@ -86,15 +133,12 @@
             
             currentSync = newScore;
             updateHeartVisual(currentSync, trend);
-            
-            // Удаляем тег из видимого текста сообщения (если нужно)
-            // SillyTavern обычно сам рендерит, но можно скрыть через CSS
         }
     }
 
-    // Инициализация
+    // Инициализация интерфейса
     function init() {
-        // Создаем плавающий виджет поверх чата
+        // Плавающий виджет в чате
         const widget = document.createElement('div');
         widget.id = 'hs-widget';
         widget.innerHTML = `
@@ -112,10 +156,9 @@
                 </div>
             </div>
         `;
-        
         document.body.appendChild(widget);
 
-        // Кнопка настроек в расширениях
+        // Панель настроек в Extensions
         const settingsPanel = document.createElement('div');
         settingsPanel.id = 'hs-settings-panel';
         settingsPanel.innerHTML = `
@@ -129,13 +172,12 @@
 
         document.getElementById('hs-init-btn').onclick = generateSyncRules;
 
-        // Слушаем новые сообщения (MutationObserver для интеграции с чатом)
+        // Слежение за новыми сообщениями в чате
         const chatObserver = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 mutation.addedNodes.forEach((node) => {
                     if (node.classList && node.classList.contains('mes')) {
-                        const text = node.innerText;
-                        parseMessageTags(text);
+                        parseMessageForTags(node.innerText);
                     }
                 });
             });
