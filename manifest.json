@@ -6,6 +6,7 @@
     "js": "index.js",
     "css": "",
     "author": "CrewwCreww",
-    "version": "1.6.0",
-    "homePage": "https://github.com/CrewwCreww/heartbeatsync"
+    "version": "2.0.0",
+    "homePage": "https://github.com/CrewwCreww/heartbeatsync",
+    "auto_update": false
 }
